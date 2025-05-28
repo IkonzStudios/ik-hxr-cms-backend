@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ik-hxr-cms-backend"
+version = "0.1.0"
+description = "CDK backend for IK HXR CMS"
+
+[tool.poe.tasks]
+# CDK Development Commands
+deploy-dev = "cdk deploy --profile ik --context env=dev"
+deploy-stage = "cdk deploy --profile ik --context env=stage"
+deploy-prod = "cdk deploy --profile ik --context env=prod"
+
+destroy-dev = "cdk destroy --profile ik --context env=dev"
+destroy-stage = "cdk destroy --profile ik --context env=stage"
+destroy-prod = "cdk destroy --profile ik --context env=prod"
+
+diff-dev = "cdk diff --profile ik --context env=dev"
+diff-stage = "cdk diff --profile ik --context env=stage"
+diff-prod = "cdk diff --profile ik --context env=prod"
+
+synth-dev = "cdk synth --profile ik --context env=dev"
+synth-stage = "cdk synth --profile ik --context env=stage"
+synth-prod = "cdk synth --profile ik --context env=prod"
+
+# Development helpers
+bootstrap = "cdk bootstrap --profile ik"
+lint = "python -m flake8 ik_hxr_cms_backend/"
+test = "python -m pytest tests/"
+format = "python -m black ik_hxr_cms_backend/"
+
+install-dev = "pip install -r requirements.txt -r requirements-dev.txt"
+install-prod = "pip install -r requirements.txt"
