@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 import os
+import sys
+from pathlib import Path
 from aws_cdk import App, Environment
 
-from ik_hxr_cms_backend.ik_hxr_cms_backend_stack import IkHxrCmsBackendStack
+# Add the project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from infrastructure.cdk.stacks.ik_hxr_cms_backend_stack import IkHxrCmsBackendStack
 
 app = App()
 
