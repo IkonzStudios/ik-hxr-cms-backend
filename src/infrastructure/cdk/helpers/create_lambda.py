@@ -14,11 +14,11 @@ def create_lambda_function(
     environment: Dict[str, str] = None,
     timeout_seconds: int = 29,
     runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_9,
-    memory_size: int = 128
+    memory_size: int = 128,
 ) -> lambda_.Function:
     """
     Create a Lambda function with customizable configurations.
-    
+
     Args:
         scope: The CDK scope/stack
         construct_id: Unique identifier for this Lambda construct (e.g., "GetNoteByIdFunction")
@@ -29,7 +29,7 @@ def create_lambda_function(
         timeout_seconds: Timeout in seconds (default: 29)
         runtime: Lambda runtime (default: Python 3.9)
         memory_size: Memory allocation in MB (default: 128)
-    
+
     Returns:
         lambda_.Function: The created Lambda function
     """

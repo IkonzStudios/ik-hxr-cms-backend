@@ -7,6 +7,7 @@ from database.dynamodb.tables.devices import create_devices_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 
+
 class IkHxrCmsBackendStack(Stack):
     def __init__(
         self,
@@ -31,10 +32,10 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "ENV": env_name
-            }
+                "ENV": env_name,
+            },
         )
-        
+
         get_device_lambda = create_lambda_function(
             scope=self,
             construct_id="GetDeviceByIdFunction",
@@ -43,10 +44,10 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "ENV": env_name
-            }
+                "ENV": env_name,
+            },
         )
-        
+
         update_device_lambda = create_lambda_function(
             scope=self,
             construct_id="UpdateDeviceByIdFunction",
@@ -55,10 +56,10 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "ENV": env_name
-            }
+                "ENV": env_name,
+            },
         )
-        
+
         get_devices_by_org_lambda = create_lambda_function(
             scope=self,
             construct_id="GetDevicesByOrgFunction",
@@ -67,8 +68,8 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "ENV": env_name
-            }
+                "ENV": env_name,
+            },
         )
 
         # Grant table permissions
@@ -105,11 +106,12 @@ class IkHxrCmsBackendStack(Stack):
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
         get_device_integration = apigateway.LambdaIntegration(get_device_lambda)
         update_device_integration = apigateway.LambdaIntegration(update_device_lambda)
-        get_devices_by_org_integration = apigateway.LambdaIntegration(get_devices_by_org_lambda)
+        get_devices_by_org_integration = apigateway.LambdaIntegration(
+            get_devices_by_org_lambda
+        )
 
         # Add API methods
         device_resource.add_method("POST", create_device_integration)
         device_id_resource.add_method("GET", get_device_integration)
         device_id_resource.add_method("PUT", update_device_integration)
         org_id_resource.add_method("GET", get_devices_by_org_integration)
-

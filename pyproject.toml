@@ -27,9 +27,9 @@ synth-prod = "cdk synth --profile ik --context env=prod"
 
 # Development helpers
 bootstrap = "cdk bootstrap --profile ik"
-lint = "python -m flake8 ik_hxr_cms_backend/"
+lint = "python -m flake8 src/ --max-line-length=120"
 test = "python -m pytest tests/"
-format = "python -m black ik_hxr_cms_backend/"
+format = "python -m black src/"
 
 install-dev = "pip install -r requirements.txt -r requirements-dev.txt"
 install-prod = "pip install -r requirements.txt"
