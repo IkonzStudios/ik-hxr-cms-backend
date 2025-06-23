@@ -4,8 +4,10 @@ from aws_cdk import (
 )
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
+from database.dynamodb.tables.contents import create_contents_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
+from helpers.api_policies import create_ip_restriction_policy
 
 
 class IkHxrCmsBackendStack(Stack):
@@ -22,6 +24,7 @@ class IkHxrCmsBackendStack(Stack):
 
         # Create DynamoDB tables
         devices_table = create_devices_table(self, env_name)
+        contents_table = create_contents_table(self, env_name)
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -72,18 +75,74 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Content Lambda functions
+        create_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateContentFunction",
+            function_name=f"Cms-CreateContent-{env_name_capitalized}",
+            handler="create_content.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetContentByIdFunction",
+            function_name=f"Cms-GetContentById-{env_name_capitalized}",
+            handler="get_content_by_id.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateContentByIdFunction",
+            function_name=f"Cms-UpdateContentById-{env_name_capitalized}",
+            handler="update_content_by_id.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_contents_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetContentsByOrgFunction",
+            function_name=f"Cms-GetContentsByOrg-{env_name_capitalized}",
+            handler="get_all_contents_by_org_id.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
 
-        # Create API Gateway
+        # Grant content table permissions
+        grant_table_permissions(create_content_lambda, contents_table, "write")
+        grant_table_permissions(get_content_lambda, contents_table, "read")
+        grant_table_permissions(update_content_lambda, contents_table, "read_write")
+        grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
+
+        # Create API Gateway with IP restriction policy
         api = apigateway.RestApi(
             self,
             "CmsApi",
             rest_api_name=f"cms-api-{env_name}",
             description="CMS Backend API",
+            policy=create_ip_restriction_policy(env_name),
             deploy_options=apigateway.StageOptions(
                 stage_name=env_name or "dev",
                 throttling_rate_limit=1000,
@@ -102,6 +161,12 @@ class IkHxrCmsBackendStack(Stack):
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
 
+        # Create Content API resources
+        content_resource = api.root.add_resource("content")
+        content_id_resource = content_resource.add_resource("{id}")
+        content_organization_resource = content_resource.add_resource("organization")
+        content_org_id_resource = content_organization_resource.add_resource("{orgId}")
+
         # Create Lambda integrations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
         get_device_integration = apigateway.LambdaIntegration(get_device_lambda)
@@ -110,8 +175,22 @@ class IkHxrCmsBackendStack(Stack):
             get_devices_by_org_lambda
         )
 
+        # Create Content Lambda integrations
+        create_content_integration = apigateway.LambdaIntegration(create_content_lambda)
+        get_content_integration = apigateway.LambdaIntegration(get_content_lambda)
+        update_content_integration = apigateway.LambdaIntegration(update_content_lambda)
+        get_contents_by_org_integration = apigateway.LambdaIntegration(
+            get_contents_by_org_lambda
+        )
+
         # Add API methods
         device_resource.add_method("POST", create_device_integration)
         device_id_resource.add_method("GET", get_device_integration)
         device_id_resource.add_method("PUT", update_device_integration)
         org_id_resource.add_method("GET", get_devices_by_org_integration)
+
+        # Add Content API methods
+        content_resource.add_method("POST", create_content_integration)
+        content_id_resource.add_method("GET", get_content_integration)
+        content_id_resource.add_method("PUT", update_content_integration)
+        content_org_id_resource.add_method("GET", get_contents_by_org_integration)
