@@ -5,6 +5,7 @@ from aws_cdk import (
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
+from database.dynamodb.tables.schedules import create_schedules_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -25,6 +26,7 @@ class IkHxrCmsBackendStack(Stack):
         # Create DynamoDB tables
         devices_table = create_devices_table(self, env_name)
         contents_table = create_contents_table(self, env_name)
+        schedules_table = create_schedules_table(self, env_name)
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -124,6 +126,55 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Schedule Lambda functions
+        create_schedule_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateScheduleFunction",
+            function_name=f"Cms-CreateSchedule-{env_name_capitalized}",
+            handler="create_schedule.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_schedule_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetScheduleByIdFunction",
+            function_name=f"Cms-GetScheduleById-{env_name_capitalized}",
+            handler="get_schedule_by_id.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_schedule_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateScheduleByIdFunction",
+            function_name=f"Cms-UpdateScheduleById-{env_name_capitalized}",
+            handler="update_schedule_by_id.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_schedules_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetSchedulesByOrgFunction",
+            function_name=f"Cms-GetSchedulesByOrg-{env_name_capitalized}",
+            handler="get_all_schedules_by_org_id.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -135,6 +186,12 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_content_lambda, contents_table, "read")
         grant_table_permissions(update_content_lambda, contents_table, "read_write")
         grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
+
+        # Grant schedule table permissions
+        grant_table_permissions(create_schedule_lambda, schedules_table, "write")
+        grant_table_permissions(get_schedule_lambda, schedules_table, "read")
+        grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
+        grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
 
         # Create API Gateway with IP restriction policy
         api = apigateway.RestApi(
@@ -155,19 +212,14 @@ class IkHxrCmsBackendStack(Stack):
             ),
         )
 
-        # Create API resources
+        # ------------------------------------- DEVICE API -------------------------------------
+        # API resources
         device_resource = api.root.add_resource("device")
         device_id_resource = device_resource.add_resource("{id}")
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
 
-        # Create Content API resources
-        content_resource = api.root.add_resource("content")
-        content_id_resource = content_resource.add_resource("{id}")
-        content_organization_resource = content_resource.add_resource("organization")
-        content_org_id_resource = content_organization_resource.add_resource("{orgId}")
-
-        # Create Lambda integrations
+        # Lambda integrations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
         get_device_integration = apigateway.LambdaIntegration(get_device_lambda)
         update_device_integration = apigateway.LambdaIntegration(update_device_lambda)
@@ -175,7 +227,21 @@ class IkHxrCmsBackendStack(Stack):
             get_devices_by_org_lambda
         )
 
-        # Create Content Lambda integrations
+        # API methods
+        device_resource.add_method("POST", create_device_integration)
+        device_id_resource.add_method("GET", get_device_integration)
+        device_id_resource.add_method("PUT", update_device_integration)
+        org_id_resource.add_method("GET", get_devices_by_org_integration)
+        # ------------------------------------- END OF DEVICE API -------------------------------------
+
+        # ------------------------------------- CONTENT API -------------------------------------
+        # API resources
+        content_resource = api.root.add_resource("content")
+        content_id_resource = content_resource.add_resource("{id}")
+        content_organization_resource = content_resource.add_resource("organization")
+        content_org_id_resource = content_organization_resource.add_resource("{orgId}")
+
+        # Lambda integrations
         create_content_integration = apigateway.LambdaIntegration(create_content_lambda)
         get_content_integration = apigateway.LambdaIntegration(get_content_lambda)
         update_content_integration = apigateway.LambdaIntegration(update_content_lambda)
@@ -183,14 +249,37 @@ class IkHxrCmsBackendStack(Stack):
             get_contents_by_org_lambda
         )
 
-        # Add API methods
-        device_resource.add_method("POST", create_device_integration)
-        device_id_resource.add_method("GET", get_device_integration)
-        device_id_resource.add_method("PUT", update_device_integration)
-        org_id_resource.add_method("GET", get_devices_by_org_integration)
-
-        # Add Content API methods
+        # Content API methods
         content_resource.add_method("POST", create_content_integration)
         content_id_resource.add_method("GET", get_content_integration)
         content_id_resource.add_method("PUT", update_content_integration)
         content_org_id_resource.add_method("GET", get_contents_by_org_integration)
+        # ------------------------------------- END OF CONTENT API -------------------------------------
+
+        # ------------------------------------- SCHEDULE API -------------------------------------
+        # API resources
+        schedule_resource = api.root.add_resource("schedule")
+        schedule_id_resource = schedule_resource.add_resource("{id}")
+        schedule_organization_resource = schedule_resource.add_resource("organization")
+        schedule_org_id_resource = schedule_organization_resource.add_resource(
+            "{orgId}"
+        )
+
+        # Create Schedule Lambda integrations
+        create_schedule_integration = apigateway.LambdaIntegration(
+            create_schedule_lambda
+        )
+        get_schedule_integration = apigateway.LambdaIntegration(get_schedule_lambda)
+        update_schedule_integration = apigateway.LambdaIntegration(
+            update_schedule_lambda
+        )
+        get_schedules_by_org_integration = apigateway.LambdaIntegration(
+            get_schedules_by_org_lambda
+        )
+
+        # Add Schedule API methods
+        schedule_resource.add_method("POST", create_schedule_integration)
+        schedule_id_resource.add_method("GET", get_schedule_integration)
+        schedule_id_resource.add_method("PUT", update_schedule_integration)
+        schedule_org_id_resource.add_method("GET", get_schedules_by_org_integration)
+        # ------------------------------------- END OF SCHEDULE API -------------------------------------
