@@ -6,6 +6,7 @@ from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
+from database.dynamodb.tables.playlists import create_playlists_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -27,6 +28,7 @@ class IkHxrCmsBackendStack(Stack):
         devices_table = create_devices_table(self, env_name)
         contents_table = create_contents_table(self, env_name)
         schedules_table = create_schedules_table(self, env_name)
+        playlists_table = create_playlists_table(self, env_name)
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -175,6 +177,55 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create playlist Lambda functions
+        create_playlist_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreatePlaylistFunction",
+            function_name=f"Cms-CreatePlaylist-{env_name_capitalized}",
+            handler="create_playlist.handler",
+            code_path="src/lambda/playlist",
+            environment={
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_playlist_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetPlaylistByIdFunction",
+            function_name=f"Cms-GetPlaylistById-{env_name_capitalized}",
+            handler="get_playlist_by_id.handler",
+            code_path="src/lambda/playlist",
+            environment={
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_playlist_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdatePlaylistByIdFunction",
+            function_name=f"Cms-UpdatePlaylistById-{env_name_capitalized}",
+            handler="update_playlist_by_id.handler",
+            code_path="src/lambda/playlist",
+            environment={
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_playlists_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetPlaylistsByOrgFunction",
+            function_name=f"Cms-GetPlaylistsByOrg-{env_name_capitalized}",
+            handler="get_all_playlists_by_org_id.handler",
+            code_path="src/lambda/playlist",
+            environment={
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -192,6 +243,12 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
+
+        # Grant playlist table permissions
+        grant_table_permissions(create_playlist_lambda, playlists_table, "write")
+        grant_table_permissions(get_playlist_lambda, playlists_table, "read")
+        grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
+        grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
 
         # Create API Gateway with IP restriction policy
         api = apigateway.RestApi(
@@ -283,3 +340,25 @@ class IkHxrCmsBackendStack(Stack):
         schedule_id_resource.add_method("PUT", update_schedule_integration)
         schedule_org_id_resource.add_method("GET", get_schedules_by_org_integration)
         # ------------------------------------- END OF SCHEDULE API -------------------------------------
+
+        # ------------------------------------- PLAYLIST API -------------------------------------
+        # API resources
+        playlist_resource = api.root.add_resource("playlist")
+        playlist_id_resource = playlist_resource.add_resource("{id}")
+        playlist_organization_resource = playlist_resource.add_resource("organization")
+        playlist_org_id_resource = playlist_organization_resource.add_resource("{orgId}")
+
+        # Lambda integrations
+        create_playlist_integration = apigateway.LambdaIntegration(create_playlist_lambda)
+        get_playlist_integration = apigateway.LambdaIntegration(get_playlist_lambda)
+        update_playlist_integration = apigateway.LambdaIntegration(update_playlist_lambda)
+        get_playlists_by_org_integration = apigateway.LambdaIntegration(
+            get_playlists_by_org_lambda
+        )
+
+        # Add playlist API methods
+        playlist_resource.add_method("POST", create_playlist_integration)
+        playlist_id_resource.add_method("GET", get_playlist_integration)
+        playlist_id_resource.add_method("PUT", update_playlist_integration)
+        playlist_org_id_resource.add_method("GET", get_playlists_by_org_integration)
+        # ------------------------------------- END OF PLAYLIST API -------------------------------------
