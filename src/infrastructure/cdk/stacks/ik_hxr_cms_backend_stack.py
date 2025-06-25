@@ -7,6 +7,7 @@ from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
 from database.dynamodb.tables.playlists import create_playlists_table
+from database.dynamodb.tables.users import create_users_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -29,6 +30,7 @@ class IkHxrCmsBackendStack(Stack):
         contents_table = create_contents_table(self, env_name)
         schedules_table = create_schedules_table(self, env_name)
         playlists_table = create_playlists_table(self, env_name)
+        users_table = create_users_table(self, env_name)
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -226,6 +228,55 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create User Lambda functions
+        create_user_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateUserFunction",
+            function_name=f"Cms-CreateUser-{env_name_capitalized}",
+            handler="create_user.handler",
+            code_path="src/lambda/user",
+            environment={
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_user_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetUserByIdFunction",
+            function_name=f"Cms-GetUserById-{env_name_capitalized}",
+            handler="get_user_by_id.handler",
+            code_path="src/lambda/user",
+            environment={
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_user_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateUserByIdFunction",
+            function_name=f"Cms-UpdateUserById-{env_name_capitalized}",
+            handler="update_user_by_id.handler",
+            code_path="src/lambda/user",
+            environment={
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_users_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetUsersByOrgFunction",
+            function_name=f"Cms-GetUsersByOrg-{env_name_capitalized}",
+            handler="get_all_users_by_org_id.handler",
+            code_path="src/lambda/user",
+            environment={
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -249,6 +300,12 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_playlist_lambda, playlists_table, "read")
         grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
         grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
+
+        # Grant user table permissions
+        grant_table_permissions(create_user_lambda, users_table, "read_write")
+        grant_table_permissions(get_user_lambda, users_table, "read")
+        grant_table_permissions(update_user_lambda, users_table, "read_write")
+        grant_table_permissions(get_users_by_org_lambda, users_table, "read")
 
         # Create API Gateway with IP restriction policy
         api = apigateway.RestApi(
@@ -346,12 +403,18 @@ class IkHxrCmsBackendStack(Stack):
         playlist_resource = api.root.add_resource("playlist")
         playlist_id_resource = playlist_resource.add_resource("{id}")
         playlist_organization_resource = playlist_resource.add_resource("organization")
-        playlist_org_id_resource = playlist_organization_resource.add_resource("{orgId}")
+        playlist_org_id_resource = playlist_organization_resource.add_resource(
+            "{orgId}"
+        )
 
         # Lambda integrations
-        create_playlist_integration = apigateway.LambdaIntegration(create_playlist_lambda)
+        create_playlist_integration = apigateway.LambdaIntegration(
+            create_playlist_lambda
+        )
         get_playlist_integration = apigateway.LambdaIntegration(get_playlist_lambda)
-        update_playlist_integration = apigateway.LambdaIntegration(update_playlist_lambda)
+        update_playlist_integration = apigateway.LambdaIntegration(
+            update_playlist_lambda
+        )
         get_playlists_by_org_integration = apigateway.LambdaIntegration(
             get_playlists_by_org_lambda
         )
@@ -362,3 +425,25 @@ class IkHxrCmsBackendStack(Stack):
         playlist_id_resource.add_method("PUT", update_playlist_integration)
         playlist_org_id_resource.add_method("GET", get_playlists_by_org_integration)
         # ------------------------------------- END OF PLAYLIST API -------------------------------------
+
+        # ------------------------------------- USER API -------------------------------------
+        # API resources
+        user_resource = api.root.add_resource("user")
+        user_id_resource = user_resource.add_resource("{id}")
+        user_organization_resource = user_resource.add_resource("organization")
+        user_org_id_resource = user_organization_resource.add_resource("{orgId}")
+
+        # Lambda integrations
+        create_user_integration = apigateway.LambdaIntegration(create_user_lambda)
+        get_user_integration = apigateway.LambdaIntegration(get_user_lambda)
+        update_user_integration = apigateway.LambdaIntegration(update_user_lambda)
+        get_users_by_org_integration = apigateway.LambdaIntegration(
+            get_users_by_org_lambda
+        )
+
+        # Add user API methods
+        user_resource.add_method("POST", create_user_integration)
+        user_id_resource.add_method("GET", get_user_integration)
+        user_id_resource.add_method("PUT", update_user_integration)
+        user_org_id_resource.add_method("GET", get_users_by_org_integration)
+        # ------------------------------------- END OF USER API -------------------------------------
