@@ -8,6 +8,7 @@ from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
 from database.dynamodb.tables.playlists import create_playlists_table
 from database.dynamodb.tables.users import create_users_table
+from database.dynamodb.tables.organizations import create_organizations_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -31,6 +32,7 @@ class IkHxrCmsBackendStack(Stack):
         schedules_table = create_schedules_table(self, env_name)
         playlists_table = create_playlists_table(self, env_name)
         users_table = create_users_table(self, env_name)
+        organizations_table = create_organizations_table(self, env_name)
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -277,6 +279,55 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Organization Lambda functions
+        create_organization_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateOrganizationFunction",
+            function_name=f"Cms-CreateOrganization-{env_name_capitalized}",
+            handler="create_organization.handler",
+            code_path="src/lambda/organization",
+            environment={
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_organization_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetOrganizationByIdFunction",
+            function_name=f"Cms-GetOrganizationById-{env_name_capitalized}",
+            handler="get_organization_by_id.handler",
+            code_path="src/lambda/organization",
+            environment={
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_organization_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateOrganizationByIdFunction",
+            function_name=f"Cms-UpdateOrganizationById-{env_name_capitalized}",
+            handler="update_organization_by_id.handler",
+            code_path="src/lambda/organization",
+            environment={
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_all_organizations_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetAllOrganizationsFunction",
+            function_name=f"Cms-GetAllOrganizations-{env_name_capitalized}",
+            handler="get_all_organizations.handler",
+            code_path="src/lambda/organization",
+            environment={
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -306,6 +357,18 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_user_lambda, users_table, "read")
         grant_table_permissions(update_user_lambda, users_table, "read_write")
         grant_table_permissions(get_users_by_org_lambda, users_table, "read")
+
+        # Grant organization table permissions
+        grant_table_permissions(
+            create_organization_lambda, organizations_table, "read_write"
+        )
+        grant_table_permissions(get_organization_lambda, organizations_table, "read")
+        grant_table_permissions(
+            update_organization_lambda, organizations_table, "read_write"
+        )
+        grant_table_permissions(
+            get_all_organizations_lambda, organizations_table, "read"
+        )
 
         # Create API Gateway with IP restriction policy
         api = apigateway.RestApi(
@@ -447,3 +510,29 @@ class IkHxrCmsBackendStack(Stack):
         user_id_resource.add_method("PUT", update_user_integration)
         user_org_id_resource.add_method("GET", get_users_by_org_integration)
         # ------------------------------------- END OF USER API -------------------------------------
+
+        # ------------------------------------- ORGANIZATION API -------------------------------------
+        # API resources
+        organization_resource = api.root.add_resource("organization")
+        organization_id_resource = organization_resource.add_resource("{id}")
+
+        # Lambda integrations
+        create_organization_integration = apigateway.LambdaIntegration(
+            create_organization_lambda
+        )
+        get_organization_integration = apigateway.LambdaIntegration(
+            get_organization_lambda
+        )
+        update_organization_integration = apigateway.LambdaIntegration(
+            update_organization_lambda
+        )
+        get_all_organizations_integration = apigateway.LambdaIntegration(
+            get_all_organizations_lambda
+        )
+
+        # Add organization API methods
+        organization_resource.add_method("POST", create_organization_integration)
+        organization_resource.add_method("GET", get_all_organizations_integration)
+        organization_id_resource.add_method("GET", get_organization_integration)
+        organization_id_resource.add_method("PUT", update_organization_integration)
+        # ------------------------------------- END OF ORGANIZATION API -------------------------------------
