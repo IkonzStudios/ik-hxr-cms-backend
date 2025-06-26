@@ -239,10 +239,4 @@ def create_application_response(application: Dict[str, Any]) -> Dict[str, Any]:
         Success response dictionary with application data
     """
     formatted_application = format_response_application(application)
-<<<<<<< HEAD:lambda/application/utils/helpers.py
-
-    return {"statusCode": 200, "body": json.dumps({"application": formatted_application})}
-=======
->>>>>>> e04eae9 (Replaced inline IAM permissions with centralized grant_permissions helper supporting 'read', 'write', and 'read_write'):src/lambda/application/utils/helpers.py
-
     return {"statusCode": 200, "body": json.dumps({"application": formatted_application})}
