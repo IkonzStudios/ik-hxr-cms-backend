@@ -1,102 +1,127 @@
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
+from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_sns as sns
+from aws_cdk import aws_sqs as sqs
+from typing import List, Union
+
+# Semantic Permission Map
+PERMISSIONS_MAP = {
+    "read": ["get_item", "scan"],
+    "write": ["put_item", "update_item", "delete_item"],
+    "read_write": ["get_item", "scan", "put_item", "update_item", "delete_item"]
+}
+
+# Fine-Grained IAM Actions Map
+PERMISSION_ACTIONS = {
+    "dynamodb": {
+        "get_item": "dynamodb:GetItem",
+        "put_item": "dynamodb:PutItem",
+        "update_item": "dynamodb:UpdateItem",
+        "delete_item": "dynamodb:DeleteItem",
+        "query": "dynamodb:Query",
+        "scan": "dynamodb:Scan",
+        "batch_get_item": "dynamodb:BatchGetItem",
+        "batch_write_item": "dynamodb:BatchWriteItem",
+    },
+    "s3": {
+        "get_object": "s3:GetObject",
+        "put_object": "s3:PutObject",
+        "delete_object": "s3:DeleteObject",
+        "list_bucket": "s3:ListBucket",
+    },
+    "sns": {
+        "publish": "sns:Publish",
+        "subscribe": "sns:Subscribe",
+    },
+    "sqs": {
+        "send_message": "sqs:SendMessage",
+        "receive_message": "sqs:ReceiveMessage",
+        "delete_message": "sqs:DeleteMessage",
+    },
+}
 
 
-def grant_table_permissions(lambda_function: lambda_.Function, table, permissions: str):
-    """
-    Grant DynamoDB table permissions to a Lambda function.
-
-    Args:
-        lambda_function: The Lambda function to grant permissions to
-        table: The DynamoDB table
-        permissions: Type of permissions ('read', 'write', 'read_write')
-    """
-    if permissions == "read":
-        table.grant_read_data(lambda_function)
-    elif permissions == "write":
-        table.grant_write_data(lambda_function)
-    elif permissions == "read_write":
-        table.grant_read_write_data(lambda_function)
-    else:
-        raise ValueError(
-            f"Invalid permissions: {permissions}. Use 'read', 'write', or 'read_write'"
-        )
-
-
-def grant_multiple_table_permissions(
-    lambda_function: lambda_.Function, tables_and_permissions: list
+def grant_table_permissions(
+    lambda_function: lambda_.Function,
+    resource: Union[dynamodb.Table, s3.Bucket, sns.Topic, sqs.Queue],
+    service: str,
+    actions: Union[str, List[str]],
+    include_indexes: bool = False,
 ):
     """
-    Grant multiple DynamoDB table permissions to a Lambda function.
+    Grant fine-grained IAM permissions to a Lambda function.
 
     Args:
-        lambda_function: The Lambda function to grant permissions to
-        tables_and_permissions: List of tuples (table, permissions)
-                               e.g., [(devices_table, 'read'), (users_table, 'write')]
+        lambda_function: Target Lambda function
+        resource: AWS resource (Table, Bucket, Topic, Queue)
+        service: AWS service ('dynamodb', 's3', 'sns', 'sqs')
+        actions: Semantic (e.g., 'read') or fine-grained list (e.g., ['put_item'])
+        include_indexes: (DynamoDB only) Include GSIs/LSIs in resource ARNs
     """
-    for table, permissions in tables_and_permissions:
-        grant_table_permissions(lambda_function, table, permissions)
+    if service not in PERMISSION_ACTIONS:
+        raise ValueError(f"Unsupported service: {service}")
 
+    action_map = PERMISSION_ACTIONS[service]
 
-def grant_s3_permissions(lambda_function: lambda_.Function, bucket, permissions: str):
-    """
-    Grant S3 bucket permissions to a Lambda function.
+    # Resolve semantic permission keyword to list of actions
+    if isinstance(actions, str):
+        if actions not in PERMISSIONS_MAP:
+            raise ValueError(f"Invalid semantic permission '{actions}'. Use {list(PERMISSIONS_MAP.keys())}.")
+        actions = PERMISSIONS_MAP[actions]
 
-    Args:
-        lambda_function: The Lambda function to grant permissions to
-        bucket: The S3 bucket
-        permissions: Type of permissions ('read', 'write', 'read_write', 'delete')
-    """
-    if permissions == "read":
-        bucket.grant_read(lambda_function)
-    elif permissions == "write":
-        bucket.grant_write(lambda_function)
-    elif permissions == "read_write":
-        bucket.grant_read_write(lambda_function)
-    elif permissions == "delete":
-        bucket.grant_delete(lambda_function)
-    else:
-        raise ValueError(
-            f"Invalid permissions: {permissions}. Use 'read', 'write', 'read_write', or 'delete'"
+    # Validate actions
+    invalid = [a for a in actions if a not in action_map]
+    if invalid:
+        raise ValueError(f"Invalid actions for {service}: {invalid}")
+
+    iam_actions = [action_map[a] for a in actions]
+    resource_arns = []
+
+    if service == "dynamodb":
+        resource_arns = [resource.table_arn]
+        if include_indexes:
+            resource_arns.append(f"{resource.table_arn}/index/*")
+
+    elif service == "s3":
+        bucket_arn = resource.bucket_arn
+        object_arn = f"{bucket_arn}/*"
+        for action in iam_actions:
+            if "List" in action:
+                resource_arns.append(bucket_arn)
+            else:
+                resource_arns.append(object_arn)
+
+    elif service in {"sns", "sqs"}:
+        resource_arns = [resource.topic_arn if service == "sns" else resource.queue_arn]
+
+    lambda_function.add_to_role_policy(
+        iam.PolicyStatement(
+            actions=iam_actions,
+            resources=resource_arns,
         )
+    )
 
 
-def grant_sns_permissions(
-    lambda_function: lambda_.Function, topic, permissions: str = "publish"
+def grant_multiple_permissions(
+    lambda_function: lambda_.Function,
+    permissions: List[dict]
 ):
     """
-    Grant SNS topic permissions to a Lambda function.
+    Grant multiple permissions in batch.
 
-    Args:
-        lambda_function: The Lambda function to grant permissions to
-        topic: The SNS topic
-        permissions: Type of permissions ('publish', 'subscribe')
+    Example:
+        grant_multiple_permissions(my_lambda, [
+            {"resource": my_table, "service": "dynamodb", "actions": "read"},
+            {"resource": my_bucket, "service": "s3", "actions": ["put_object", "get_object"]}
+        ])
     """
-    if permissions == "publish":
-        topic.grant_publish(lambda_function)
-    elif permissions == "subscribe":
-        topic.grant_subscribe(lambda_function)
-    else:
-        raise ValueError(
-            f"Invalid permissions: {permissions}. Use 'publish' or 'subscribe'"
-        )
-
-
-def grant_sqs_permissions(lambda_function: lambda_.Function, queue, permissions: str):
-    """
-    Grant SQS queue permissions to a Lambda function.
-
-    Args:
-        lambda_function: The Lambda function to grant permissions to
-        queue: The SQS queue
-        permissions: Type of permissions ('send', 'receive', 'consume')
-    """
-    if permissions == "send":
-        queue.grant_send_messages(lambda_function)
-    elif permissions == "receive":
-        queue.grant_consume_messages(lambda_function)
-    elif permissions == "consume":
-        queue.grant_consume_messages(lambda_function)
-    else:
-        raise ValueError(
-            f"Invalid permissions: {permissions}. Use 'send', 'receive', or 'consume'"
+    for perm in permissions:
+        grant_permissions(
+            lambda_function=lambda_function,
+            resource=perm["resource"],
+            service=perm["service"],
+            actions=perm["actions"],
+            include_indexes=perm.get("include_indexes", False)
         )

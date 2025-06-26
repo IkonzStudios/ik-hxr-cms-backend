@@ -6,6 +6,7 @@ from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
+from database.dynamodb.tables.application import create_application_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -27,8 +28,50 @@ class IkHxrCmsBackendStack(Stack):
         devices_table = create_devices_table(self, env_name)
         contents_table = create_contents_table(self, env_name)
         schedules_table = create_schedules_table(self, env_name)
+        application_table=create_application_table(self, env_name)
 
         # Create Lambda functions
+
+        #create application lambda functions
+        create_application_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateApplicationFunction",
+            function_name=f"Cms-CreateApplication-{env_name_capitalized}",
+            handler="create_application.handler",
+            code_path="lambda/application",
+            environment={
+                "APPLICATION_TABLE_NAME": application_table.table_name,
+                "ENV": env_name,
+            },
+        )
+        get_all_applications_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetAllApplicationsFunction",
+            function_name=f"Cms-GetAllApplications-{env_name_capitalized}",
+            handler="get_all_applications.handler",
+            code_path="lambda/application",
+            environment={
+                "APPLICATION_TABLE_NAME": application_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+
+
+        get_application_by_id_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetApplicationByIdFunction",
+            function_name=f"Cms-GetApplicationById-{env_name_capitalized}",
+            handler="get_application_by_id.handler",
+            code_path="lambda/application",
+            environment={
+                "APPLICATION_TABLE_NAME": application_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+
+        #create device lambda functions
         create_device_lambda = create_lambda_function(
             scope=self,
             construct_id="CreateDeviceFunction",
@@ -175,6 +218,12 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        #Grant table permissions for application 
+        grant_table_permissions(create_application_lambda, application_table, service="dynamodb", actions="write")
+        grant_table_permissions(get_all_applications_lambda,application_table,service="dynamodb",actions="read")
+        grant_table_permissions(get_application_by_id_lambda, application_table, service="dynamodb", actions="read")
+
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -211,6 +260,25 @@ class IkHxrCmsBackendStack(Stack):
                 allow_headers=apigateway.Cors.DEFAULT_HEADERS,
             ),
         )
+
+
+         # ------------------------------------- Application API -------------------------------------
+         # Create API Resources
+        applications_resource = api.root.add_resource("applications")
+        single_app_resource = applications_resource.add_resource("{id}")
+
+        
+        # Create Lambda Integrations
+        create_app_integration = apigateway.LambdaIntegration(create_application_lambda)
+        get_all_apps_integration = apigateway.LambdaIntegration(get_all_applications_lambda)
+        get_app_by_id_integration = apigateway.LambdaIntegration(get_application_by_id_lambda)
+
+        
+        # Add API Methods
+        applications_resource.add_method("POST", create_app_integration)
+        applications_resource.add_method("GET", get_all_apps_integration)
+        single_app_resource.add_method("GET", get_app_by_id_integration)
+        # ------------------------------------- END OF Application API -------------------------------------
 
         # ------------------------------------- DEVICE API -------------------------------------
         # API resources

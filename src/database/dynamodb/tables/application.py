@@ -12,4 +12,3 @@ def create_application_table(scope: Construct, env_name: str = None) -> dynamodb
         removal_policy=RemovalPolicy.RETAIN,
         encryption=dynamodb.TableEncryption.AWS_MANAGED,
     )
-
