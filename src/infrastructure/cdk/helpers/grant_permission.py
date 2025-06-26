@@ -118,7 +118,7 @@ def grant_multiple_permissions(
         ])
     """
     for perm in permissions:
-        grant_permissions(
+        grant_table_permissions(
             lambda_function=lambda_function,
             resource=perm["resource"],
             service=perm["service"],

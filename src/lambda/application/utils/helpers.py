@@ -2,9 +2,10 @@ import json
 import os
 import boto3
 from decimal import Decimal
-from utils.constants import APPLICATION_STATUSES
+from utils.constants import REQUIRED_APPLICATION_FIELDS
 from typing import Dict, Any, Tuple, Optional
 from datetime import datetime
+import uuid
 
 dynamodb = boto3.resource("dynamodb")
 APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE_NAME")
@@ -56,6 +57,21 @@ def parse_request_body(
 
     return body, None
 
+def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Validate that all required fields are present in the request body.
+
+    Returns:
+        None if validation passes, error response dict if validation fails
+    """
+    for field in REQUIRED_APPLICATION_FIELDS:
+        if not body.get(field["column_name"]):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f'{field["name"]} is required'}),
+            }
+    return None
+
 
 def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -78,24 +94,6 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
     return application_data
 
-
-def validate_required_fields(application_data: dict, required_fields: list) -> tuple[bool, str | None]:
-    """
-    Validates that all required fields are present and valid in the input data.
-
-    :param data: The input dictionary to validate.
-    :param required_fields: A list of required field names.
-    :return: Tuple of (True, None) if valid, else (False, "error message").
-    """
-    for field in required_fields:
-        if field not in application_data or application_data[field] in (None, "", []):
-            return False, f"'{field}' is required"
-
-    # Additional enum validation (e.g., for status)
-    if "status" in application_data and application_data["status"] not in APPLICATION_STATUSES:
-        return False, f"Invalid status '{application_data['status']}'. Must be one of: {APPLICATION_STATUSES}"
-
-    return True, None
 
 def save_application_to_db(
     application_data: Dict[str, Any], table_name: str
@@ -148,7 +146,7 @@ def create_success_response(application_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Success response dictionary
     """
-    response_device = format_response_application(application_data)
+    response_application = format_response_application(application_data)
 
     return {
         "statusCode": 201,
@@ -158,6 +156,7 @@ def create_success_response(application_data: Dict[str, Any]) -> Dict[str, Any]:
                 "application_id": application_data["id"],
                 "application": response_application,
             }
+            
         ),
     }
 
@@ -200,18 +199,18 @@ def get_application_by_id_from_db(
         if "Item" not in response:
             return None, {
                 "statusCode": 404,
-                "body": json.dumps({"error": "Device not found"}),
+                "body": json.dumps({"error": "Application not found"}),
             }
 
         return response["Item"], None
 
     except Exception as e:
-        print(f"Error getting device: {str(e)}")
+        print(f"Error getting application: {str(e)}")
         return None, {
             "statusCode": 500,
             "body": json.dumps({"error": "Internal server error"}),
         }
-def create_applicartions_list_response(items: list) -> Dict[str, Any]:
+def create_applications_list_response(applications: list) -> Dict[str, Any]:
     """
     Create a successful response for application list.
 
@@ -219,15 +218,15 @@ def create_applicartions_list_response(items: list) -> Dict[str, Any]:
         Success response dictionary with application list
     """
     # Format application for response
-    formatted_items = []
-    for item in items:
-        formatted_item = format_response_application(item)
-        formatted_items.append(formatted_item)
+    formatted_applications = []
+    for application in applications:
+        formatted_item = format_response_application(application)
+        formatted_applications.append(formatted_item)
 
     return {
         "statusCode": 200,
         "body": json.dumps(
-            {"devices": formatted_items, "count": len(formatted_items)}
+            {"devices": formatted_applications, "count": len(formatted_applications)}
         ),
     }
 
