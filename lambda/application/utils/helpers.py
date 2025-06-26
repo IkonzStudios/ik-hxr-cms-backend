@@ -57,11 +57,6 @@ def parse_request_body(
     return body, None
 
 
-import uuid
-from datetime import datetime
-from typing import Dict, Any
-
-
 def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Create the application data dictionary from the request body.
@@ -101,11 +96,6 @@ def validate_required_fields(data: dict, required_fields: list) -> tuple[bool, s
         return False, f"Invalid status '{data['status']}'. Must be one of: {APPLICATION_STATUSES}"
 
     return True, None
-
-import boto3
-import json
-from typing import Dict, Any, Optional
-
 
 def save_application_to_db(
     application_data: Dict[str, Any], table_name: str
