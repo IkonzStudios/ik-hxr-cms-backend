@@ -79,7 +79,7 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     return application_data
 
 
-def validate_required_fields(data: dict, required_fields: list) -> tuple[bool, str | None]:
+def validate_required_fields(application_data: dict, required_fields: list) -> tuple[bool, str | None]:
     """
     Validates that all required fields are present and valid in the input data.
 
@@ -88,12 +88,12 @@ def validate_required_fields(data: dict, required_fields: list) -> tuple[bool, s
     :return: Tuple of (True, None) if valid, else (False, "error message").
     """
     for field in required_fields:
-        if field not in data or data[field] in (None, "", []):
+        if field not in application_data or application_data[field] in (None, "", []):
             return False, f"'{field}' is required"
 
     # Additional enum validation (e.g., for status)
-    if "status" in data and data["status"] not in APPLICATION_STATUSES:
-        return False, f"Invalid status '{data['status']}'. Must be one of: {APPLICATION_STATUSES}"
+    if "status" in application_data and application_data["status"] not in APPLICATION_STATUSES:
+        return False, f"Invalid status '{application_data['status']}'. Must be one of: {APPLICATION_STATUSES}"
 
     return True, None
 
