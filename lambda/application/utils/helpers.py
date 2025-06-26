@@ -213,12 +213,12 @@ def get_application_by_id_from_db(
         }
 def create_applicartions_list_response(items: list) -> Dict[str, Any]:
     """
-    Create a successful response for devices list.
+    Create a successful response for application list.
 
     Returns:
-        Success response dictionary with devices list
+        Success response dictionary with application list
     """
-    # Format devices for response
+    # Format application for response
     formatted_items = []
     for item in items:
         formatted_item = format_response_application(item)
@@ -240,5 +240,5 @@ def create_application_response(application: Dict[str, Any]) -> Dict[str, Any]:
     """
     formatted_application = format_response_application(application)
 
-    return {"statusCode": 200, "body": json.dumps({"device": formatted_application})}
+    return {"statusCode": 200, "body": json.dumps({"application": formatted_application})}
 
