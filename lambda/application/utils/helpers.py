@@ -124,39 +124,39 @@ def save_application_to_db(
 
 
 
-def format_response_device(device_data: Dict[str, Any]) -> Dict[str, Any]:
+def format_response_application(application_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Format device data for JSON response by converting Decimal to float.
+    Format application data for JSON response by converting Decimal to float.
 
     Returns:
-        Device data with Decimal values converted to float
+        Application data with Decimal values converted to float
     """
-    response_device = device_data.copy()
+    response_application = application_data.copy()
 
-    if response_device.get("storage_left") is not None:
-        response_device["storage_left"] = float(response_device["storage_left"])
-    if response_device.get("storage_consumed") is not None:
-        response_device["storage_consumed"] = float(response_device["storage_consumed"])
+    if response_application.get("storage_left") is not None:
+        response_application["storage_left"] = float(response_application["storage_left"])
+    if response_application.get("storage_consumed") is not None:
+        response_application["storage_consumed"] = float(response_application["storage_consumed"])
 
-    return response_device
+    return response_application
 
 
-def create_success_response(device_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_success_response(application_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create a successful response for device creation.
+    Create a successful response for application creation.
 
     Returns:
         Success response dictionary
     """
-    response_device = format_response_device(device_data)
+    response_device = format_response_application(application_data)
 
     return {
         "statusCode": 201,
         "body": json.dumps(
             {
-                "message": "Device created successfully",
-                "device_id": device_data["id"],
-                "device": response_device,
+                "message": "Application created successfully",
+                "application_id": application_data["id"],
+                "application": response_application,
             }
         ),
     }
@@ -221,7 +221,7 @@ def create_applicartions_list_response(items: list) -> Dict[str, Any]:
     # Format devices for response
     formatted_items = []
     for item in items:
-        formatted_item = format_response_device(item)
+        formatted_item = format_response_application(item)
         formatted_items.append(formatted_item)
 
     return {
@@ -233,12 +233,12 @@ def create_applicartions_list_response(items: list) -> Dict[str, Any]:
 
 def create_application_response(application: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Create a successful response for single device.
+    Create a successful response for single application.
 
     Returns:
-        Success response dictionary with device data
+        Success response dictionary with application data
     """
-    formatted_application = format_response_device(application)
+    formatted_application = format_response_application(application)
 
     return {"statusCode": 200, "body": json.dumps({"device": formatted_application})}
 
