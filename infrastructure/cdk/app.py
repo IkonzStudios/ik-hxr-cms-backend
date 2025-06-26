@@ -37,6 +37,4 @@ ApplicationStack(
 )
 
 app.synth()
-# 217968404084
-# cdk deploy --context env=dev --context account=217968404084
 

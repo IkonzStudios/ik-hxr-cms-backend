@@ -1,2 +1,2 @@
-APPLICATION_STATUSES = ["active", "inactive", "draft"]
+APPLICATION_STATUSES = ["active", "inactive"]
 
