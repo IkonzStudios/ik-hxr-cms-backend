@@ -56,9 +56,26 @@ class ApplicationStack(Stack):
 
 
         # Grant Table Permissions (Correct order)
-        grant_permissions(create_app_lambda, application_table, "write")
-        grant_permissions(get_all_apps_lambda, application_table, "read")
-        grant_permissions(get_app_by_id_lambda, application_table, "read")
+        grant_permissions(
+            lambda_function=create_app_lambda,
+            resource=application_table,
+            service="dynamodb",
+            actions=["put_item"]
+        )
+
+        grant_permissions(
+            lambda_function=get_all_apps_lambda,
+            resource=application_table,
+            service="dynamodb",
+            actions=["scan"]
+        )
+
+        grant_permissions(
+            lambda_function=get_app_by_id_lambda,
+            resource=application_table,
+            service="dynamodb",
+            actions=["get_item"]
+        )
 
 
         
