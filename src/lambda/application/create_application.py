@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 # from utils.constants import STATUS_ACTIVE
 from dotenv import load_dotenv
-from utils.helpers import parse_request_body,create_application_data,save_application_to_db,create_success_response,create_error_response
+from utils.helpers import parse_request_body,validate_required_fields,create_application_data,save_application_to_db,create_success_response,create_error_response
 
 load_dotenv()
 
@@ -48,8 +48,12 @@ def handler(event, context):
             return parse_error
 
         # Validate required fields
-        if "name" not in body or "author" not in body:
-            raise ValueError("Missing required fields: 'name' or 'author'")
+        # if "name" not in body or "author" not in body:
+        #     raise ValueError("Missing required fields: 'name' or 'author'")
+
+        validation_error = validate_required_fields(body)
+        if validation_error:
+            return validation_error
 
         # Create application data (adds id, timestamps, etc.)
         application_data = create_application_data(body)
