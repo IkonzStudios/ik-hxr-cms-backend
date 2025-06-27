@@ -226,7 +226,7 @@ def create_applications_list_response(applications: list) -> Dict[str, Any]:
     return {
         "statusCode": 200,
         "body": json.dumps(
-            {"devices": formatted_applications, "count": len(formatted_applications)}
+            {"applications": formatted_applications, "count": len(formatted_applications)}
         ),
     }
 
