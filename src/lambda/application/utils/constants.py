@@ -10,10 +10,6 @@ REQUIRED_APPLICATION_FIELDS = [
         "column_name": "organization_id",
     },
     {
-        "name": "Client ID",
-        "column_name": "client_id",
-    },
-    {
         "name": "Platform",
         "column_name": "platform",  # e.g., "Android", "iOS", "Web"
     },
