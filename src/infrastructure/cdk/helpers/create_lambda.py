@@ -2,7 +2,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     Duration,
 )
-from typing import Dict
+from typing import Dict, List, Optional
 
 
 def create_lambda_function(
@@ -15,6 +15,7 @@ def create_lambda_function(
     timeout_seconds: int = 29,
     runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_9,
     memory_size: int = 128,
+    layers: Optional[List[lambda_.ILayerVersion]] = None,
 ) -> lambda_.Function:
     """
     Create a Lambda function with customizable configurations.
@@ -29,6 +30,7 @@ def create_lambda_function(
         timeout_seconds: Timeout in seconds (default: 29)
         runtime: Lambda runtime (default: Python 3.9)
         memory_size: Memory allocation in MB (default: 128)
+        layers: List of Lambda layers to attach (default: None)
 
     Returns:
         lambda_.Function: The created Lambda function
@@ -43,4 +45,5 @@ def create_lambda_function(
         timeout=Duration.seconds(timeout_seconds),
         environment=environment or {},
         memory_size=memory_size,
+        layers=layers or [],
     )

@@ -1,6 +1,9 @@
 from aws_cdk import (
     Stack,
     aws_apigateway as apigateway,
+    aws_cognito as cognito,
+    RemovalPolicy,
+    aws_iam as iam,
 )
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
@@ -12,6 +15,13 @@ from database.dynamodb.tables.organizations import create_organizations_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
+from helpers.create_cognito import (
+    create_cognito_user_pool,
+    create_cognito_user_pool_client,
+    create_cognito_identity_pool,
+    create_cognito_groups,
+)
+from helpers.create_layer import create_lambda_layer
 
 
 class IkHxrCmsBackendStack(Stack):
@@ -26,6 +36,37 @@ class IkHxrCmsBackendStack(Stack):
 
         env_name_capitalized = env_name.capitalize() if env_name else "Dev"
 
+        # Create purpose-specific Lambda layers
+        auth_dependencies_layer = create_lambda_layer(
+            scope=self,
+            construct_id="AuthDependenciesLayer",
+            layer_name=f"Cms-AuthDependencies-{env_name_capitalized}",
+            code_path="src/layers/auth-dependencies",
+            description="JWT and cryptography dependencies for authentication functions",
+        )
+
+        common_dependencies_layer = create_lambda_layer(
+            scope=self,
+            construct_id="CommonDependenciesLayer",
+            layer_name=f"Cms-CommonDependencies-{env_name_capitalized}",
+            code_path="src/layers/common-dependencies",
+            description="Common dependencies like requests for API calls",
+        )
+
+        # Create Cognito User Pool
+        user_pool = create_cognito_user_pool(self, env_name)
+
+        # Create Cognito User Pool Client
+        user_pool_client = create_cognito_user_pool_client(self, user_pool, env_name)
+
+        # Create Cognito Identity Pool
+        identity_pool = create_cognito_identity_pool(
+            self, user_pool, user_pool_client, env_name
+        )
+
+        # Create Cognito Groups
+        cognito_groups = create_cognito_groups(self, user_pool, env_name)
+
         # Create DynamoDB tables
         devices_table = create_devices_table(self, env_name)
         contents_table = create_contents_table(self, env_name)
@@ -33,6 +74,85 @@ class IkHxrCmsBackendStack(Stack):
         playlists_table = create_playlists_table(self, env_name)
         users_table = create_users_table(self, env_name)
         organizations_table = create_organizations_table(self, env_name)
+
+        # Create Lambda Authorizer with auth dependencies
+        lambda_authorizer = create_lambda_function(
+            scope=self,
+            construct_id="LambdaAuthorizerFunction",
+            function_name=f"Cms-LambdaAuthorizer-{env_name_capitalized}",
+            handler="lambda_authorizer.handler",
+            code_path="src/lambda/auth",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "ENV": env_name,
+            },
+            layers=[auth_dependencies_layer, common_dependencies_layer],
+        )
+
+        lambda_authorizer.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:GetUser",
+                    "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        # Create Auth Lambda functions with auth dependencies
+        login_lambda = create_lambda_function(
+            scope=self,
+            construct_id="LoginFunction",
+            function_name=f"Cms-Login-{env_name_capitalized}",
+            handler="login.handler",
+            code_path="src/lambda/auth",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "ENV": env_name,
+            },
+            layers=[auth_dependencies_layer, common_dependencies_layer],
+        )
+
+        change_password_lambda = create_lambda_function(
+            scope=self,
+            construct_id="ChangePasswordFunction",
+            function_name=f"Cms-ChangePassword-{env_name_capitalized}",
+            handler="change_password.handler",
+            code_path="src/lambda/auth",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "ENV": env_name,
+            },
+            layers=[auth_dependencies_layer, common_dependencies_layer],
+        )
+
+        # Grant Cognito permissions to auth Lambda functions
+        login_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminInitiateAuth",
+                    "cognito-idp:AdminRespondToAuthChallenge",
+                    "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        change_password_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminRespondToAuthChallenge",
+                    "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
 
         # Create Lambda functions
         create_device_lambda = create_lambda_function(
@@ -231,18 +351,6 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Create User Lambda functions
-        create_user_lambda = create_lambda_function(
-            scope=self,
-            construct_id="CreateUserFunction",
-            function_name=f"Cms-CreateUser-{env_name_capitalized}",
-            handler="create_user.handler",
-            code_path="src/lambda/user",
-            environment={
-                "USERS_TABLE_NAME": users_table.table_name,
-                "ENV": env_name,
-            },
-        )
-
         get_user_lambda = create_lambda_function(
             scope=self,
             construct_id="GetUserByIdFunction",
@@ -251,6 +359,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/user",
             environment={
                 "USERS_TABLE_NAME": users_table.table_name,
+                "USER_POOL_ID": user_pool.user_pool_id,
                 "ENV": env_name,
             },
         )
@@ -263,6 +372,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/user",
             environment={
                 "USERS_TABLE_NAME": users_table.table_name,
+                "USER_POOL_ID": user_pool.user_pool_id,
                 "ENV": env_name,
             },
         )
@@ -328,6 +438,91 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Superadmin Lambda function
+        create_superadmin_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateSuperadminFunction",
+            function_name=f"Cms-CreateSuperadmin-{env_name_capitalized}",
+            handler="create_initial_superadmin.handler",
+            code_path="src/lambda/cognito",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Grant Cognito permissions to Lambda functions
+        create_cognito_user_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateCognitoUserFunction",
+            function_name=f"Cms-CreateCognitoUser-{env_name_capitalized}",
+            handler="create_cognito_user.handler",
+            code_path="src/lambda/cognito",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        invite_cognito_user_lambda = create_lambda_function(
+            scope=self,
+            construct_id="InviteUserFunction",
+            function_name=f"Cms-InviteUser-{env_name_capitalized}",
+            handler="invite_user.handler",
+            code_path="src/lambda/cognito",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        invite_cognito_user_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminAddUserToGroup",
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:AdminUpdateUserAttributes",
+                    "cognito-idp:AdminSetUserPassword",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        create_cognito_user_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminAddUserToGroup",
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:AdminUpdateUserAttributes",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        # Grant Cognito permissions to superadmin Lambda
+        create_superadmin_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminAddUserToGroup",
+                    "cognito-idp:AdminSetUserPassword",
+                    "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
         # Grant table permissions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -353,7 +548,6 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
 
         # Grant user table permissions
-        grant_table_permissions(create_user_lambda, users_table, "read_write")
         grant_table_permissions(get_user_lambda, users_table, "read")
         grant_table_permissions(update_user_lambda, users_table, "read_write")
         grant_table_permissions(get_users_by_org_lambda, users_table, "read")
@@ -370,7 +564,13 @@ class IkHxrCmsBackendStack(Stack):
             get_all_organizations_lambda, organizations_table, "read"
         )
 
-        # Create API Gateway with IP restriction policy
+        # Grant user and organization permissions
+        grant_table_permissions(create_superadmin_lambda, users_table, "read_write")
+        grant_table_permissions(
+            create_superadmin_lambda, organizations_table, "read_write"
+        )
+
+        # Create API Gateway with Lambda Authorizer
         api = apigateway.RestApi(
             self,
             "CmsApi",
@@ -385,8 +585,16 @@ class IkHxrCmsBackendStack(Stack):
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
                 allow_methods=apigateway.Cors.ALL_METHODS,
-                allow_headers=apigateway.Cors.DEFAULT_HEADERS,
+                allow_headers=apigateway.Cors.DEFAULT_HEADERS + ["Authorization"],
             ),
+        )
+
+        # Create Lambda Authorizer
+        authorizer = apigateway.TokenAuthorizer(
+            self,
+            "CmsTokenAuthorizer",
+            handler=lambda_authorizer,
+            identity_source="method.request.header.Authorization",
         )
 
         # ------------------------------------- DEVICE API -------------------------------------
@@ -405,10 +613,18 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # API methods
-        device_resource.add_method("POST", create_device_integration)
-        device_id_resource.add_method("GET", get_device_integration)
-        device_id_resource.add_method("PUT", update_device_integration)
-        org_id_resource.add_method("GET", get_devices_by_org_integration)
+        device_resource.add_method(
+            "POST", create_device_integration, authorizer=authorizer
+        )
+        device_id_resource.add_method(
+            "GET", get_device_integration, authorizer=authorizer
+        )
+        device_id_resource.add_method(
+            "PUT", update_device_integration, authorizer=authorizer
+        )
+        org_id_resource.add_method(
+            "GET", get_devices_by_org_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF DEVICE API -------------------------------------
 
         # ------------------------------------- CONTENT API -------------------------------------
@@ -427,10 +643,18 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Content API methods
-        content_resource.add_method("POST", create_content_integration)
-        content_id_resource.add_method("GET", get_content_integration)
-        content_id_resource.add_method("PUT", update_content_integration)
-        content_org_id_resource.add_method("GET", get_contents_by_org_integration)
+        content_resource.add_method(
+            "POST", create_content_integration, authorizer=authorizer
+        )
+        content_id_resource.add_method(
+            "GET", get_content_integration, authorizer=authorizer
+        )
+        content_id_resource.add_method(
+            "PUT", update_content_integration, authorizer=authorizer
+        )
+        content_org_id_resource.add_method(
+            "GET", get_contents_by_org_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF CONTENT API -------------------------------------
 
         # ------------------------------------- SCHEDULE API -------------------------------------
@@ -455,10 +679,18 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Add Schedule API methods
-        schedule_resource.add_method("POST", create_schedule_integration)
-        schedule_id_resource.add_method("GET", get_schedule_integration)
-        schedule_id_resource.add_method("PUT", update_schedule_integration)
-        schedule_org_id_resource.add_method("GET", get_schedules_by_org_integration)
+        schedule_resource.add_method(
+            "POST", create_schedule_integration, authorizer=authorizer
+        )
+        schedule_id_resource.add_method(
+            "GET", get_schedule_integration, authorizer=authorizer
+        )
+        schedule_id_resource.add_method(
+            "PUT", update_schedule_integration, authorizer=authorizer
+        )
+        schedule_org_id_resource.add_method(
+            "GET", get_schedules_by_org_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF SCHEDULE API -------------------------------------
 
         # ------------------------------------- PLAYLIST API -------------------------------------
@@ -483,10 +715,18 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Add playlist API methods
-        playlist_resource.add_method("POST", create_playlist_integration)
-        playlist_id_resource.add_method("GET", get_playlist_integration)
-        playlist_id_resource.add_method("PUT", update_playlist_integration)
-        playlist_org_id_resource.add_method("GET", get_playlists_by_org_integration)
+        playlist_resource.add_method(
+            "POST", create_playlist_integration, authorizer=authorizer
+        )
+        playlist_id_resource.add_method(
+            "GET", get_playlist_integration, authorizer=authorizer
+        )
+        playlist_id_resource.add_method(
+            "PUT", update_playlist_integration, authorizer=authorizer
+        )
+        playlist_org_id_resource.add_method(
+            "GET", get_playlists_by_org_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF PLAYLIST API -------------------------------------
 
         # ------------------------------------- USER API -------------------------------------
@@ -497,7 +737,6 @@ class IkHxrCmsBackendStack(Stack):
         user_org_id_resource = user_organization_resource.add_resource("{orgId}")
 
         # Lambda integrations
-        create_user_integration = apigateway.LambdaIntegration(create_user_lambda)
         get_user_integration = apigateway.LambdaIntegration(get_user_lambda)
         update_user_integration = apigateway.LambdaIntegration(update_user_lambda)
         get_users_by_org_integration = apigateway.LambdaIntegration(
@@ -505,10 +744,13 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Add user API methods
-        user_resource.add_method("POST", create_user_integration)
-        user_id_resource.add_method("GET", get_user_integration)
-        user_id_resource.add_method("PUT", update_user_integration)
-        user_org_id_resource.add_method("GET", get_users_by_org_integration)
+        user_id_resource.add_method("GET", get_user_integration, authorizer=authorizer)
+        user_id_resource.add_method(
+            "PUT", update_user_integration, authorizer=authorizer
+        )
+        user_org_id_resource.add_method(
+            "GET", get_users_by_org_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF USER API -------------------------------------
 
         # ------------------------------------- ORGANIZATION API -------------------------------------
@@ -531,8 +773,54 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # Add organization API methods
-        organization_resource.add_method("POST", create_organization_integration)
-        organization_resource.add_method("GET", get_all_organizations_integration)
-        organization_id_resource.add_method("GET", get_organization_integration)
-        organization_id_resource.add_method("PUT", update_organization_integration)
+        organization_resource.add_method(
+            "POST", create_organization_integration, authorizer=authorizer
+        )
+        organization_resource.add_method(
+            "GET", get_all_organizations_integration, authorizer=authorizer
+        )
+        organization_id_resource.add_method(
+            "GET", get_organization_integration, authorizer=authorizer
+        )
+        organization_id_resource.add_method(
+            "PUT", update_organization_integration, authorizer=authorizer
+        )
         # ------------------------------------- END OF ORGANIZATION API -------------------------------------
+
+        # Add auth endpoints (no authentication required)
+        auth_resource = api.root.add_resource("auth")
+        login_resource = auth_resource.add_resource("login")
+        change_password_resource = auth_resource.add_resource("change-password")
+
+        login_integration = apigateway.LambdaIntegration(login_lambda)
+        change_password_integration = apigateway.LambdaIntegration(
+            change_password_lambda
+        )
+
+        login_resource.add_method("POST", login_integration)
+        change_password_resource.add_method("POST", change_password_integration)
+
+        # Add superadmin setup endpoint (no authentication required)
+        # NOTE: Commented out because we don't want to create a superadmin user on deploy
+        # superadmin_resource = api.root.add_resource("setup")
+        # superadmin_integration = apigateway.LambdaIntegration(create_superadmin_lambda)
+        # superadmin_resource.add_method("POST", superadmin_integration)
+
+        # Add new Cognito endpoints
+        cognito_resource = api.root.add_resource("cognito")
+        create_user_resource = cognito_resource.add_resource("create")
+        invite_user_resource = cognito_resource.add_resource("invite")
+
+        create_user_integration = apigateway.LambdaIntegration(
+            create_cognito_user_lambda
+        )
+        invite_user_integration = apigateway.LambdaIntegration(
+            invite_cognito_user_lambda
+        )
+
+        create_user_resource.add_method(
+            "POST", create_user_integration, authorizer=authorizer
+        )
+        invite_user_resource.add_method(
+            "POST", invite_user_integration, authorizer=authorizer
+        )

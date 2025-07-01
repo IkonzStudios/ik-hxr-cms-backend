@@ -16,6 +16,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     {
         "pathParameters": {
             "id": "device-uuid"
+        },
+        "requestContext": {
+            "authorizer": {
+                "user_id": "user-sub",
+                "email": "user@example.com",
+                "role": "admin",
+                "organization_id": "org-123"
+            }
         }
     }
     """
@@ -27,7 +35,20 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("DEVICES_TABLE_NAME environment variable not set")
 
         # Debug: Print the event structure
-        print(f"Event: {json.dumps(event)}")
+        print(f"Event object: {json.dumps(event)}")
+
+        # Extract user context from authorizer
+        request_context = event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+
+        user_id = authorizer.get("user_id")
+        user_email = authorizer.get("email")
+        user_role = authorizer.get("role")
+        user_org_id = authorizer.get("organization_id")
+
+        print(
+            f"User Context - ID: {user_id}, Email: {user_email}, Role: {user_role}, Org: {user_org_id}"
+        )
 
         # Extract device ID from path parameters
         path_parameters = event.get("pathParameters", {})
