@@ -180,13 +180,13 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
 #     }
 
 def get_application_by_id_from_db(
-    app_id: str, table_name: str
+    application_id: str, table_name: str
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """
-    Get a App by ID from DynamoDB.
+    Get a Application by ID from DynamoDB.
 
     Returns:
-        Tuple of (device_data, error_response)
+        Tuple of (application_data, error_response)
         If successful: (device_dict, None)
         If error: (None, error_response_dict)
     """
