@@ -11,9 +11,6 @@ dynamodb = boto3.resource("dynamodb")
 APPLICATIONS_TABLE = os.environ.get("APPLICATIONS_TABLE_NAME")
 table = dynamodb.Table(APPLICATIONS_TABLE)
 
-import json
-from typing import Dict, Any, Optional, Tuple
-
 
 def parse_request_body(
     event: Dict[str, Any]
