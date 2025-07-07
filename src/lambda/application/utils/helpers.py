@@ -72,6 +72,29 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             }
     return None
 
+def convert_storage_values(body: Dict[str, Any]) -> Dict[str, Optional[Decimal]]:
+    """
+    Convert storage values to Decimal for DynamoDB compatibility.
+
+    Returns:
+        Dictionary with storage_left and storage_consumed as Decimal or None
+    """
+    result = {}
+
+    storage_left = body.get("storage_left")
+    if storage_left is not None:
+        result["storage_left"] = Decimal(str(storage_left))
+    else:
+        result["storage_left"] = None
+
+    storage_consumed = body.get("storage_consumed")
+    if storage_consumed is not None:
+        result["storage_consumed"] = Decimal(str(storage_consumed))
+    else:
+        result["storage_consumed"] = None
+
+    return result
+
 
 def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -80,6 +103,9 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Complete application data dictionary ready for DynamoDB
     """
+     # Convert storage values
+    storage = convert_storage_values(body)
+    
     application_id = str(uuid.uuid4())
     current_time = datetime.now().isoformat()
 
@@ -90,6 +116,8 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "status": body.get("status", "active"),
         "created_at": current_time,
         "updated_at": current_time,
+        "storage_left": storage["storage_left"],
+        "storage_consumed": storage["storage_consumed"],
     }
 
     return application_data
@@ -119,7 +147,6 @@ def save_application_to_db(
             "statusCode": 409,
             "body": json.dumps({"error": "Application with this ID already exists"}),
         }
-
 
 
 def format_response_application(application_data: Dict[str, Any]) -> Dict[str, Any]:
