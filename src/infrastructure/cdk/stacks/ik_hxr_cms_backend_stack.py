@@ -22,6 +22,8 @@ from helpers.create_cognito import (
     create_cognito_groups,
 )
 from helpers.create_layer import create_lambda_layer
+from helpers.create_s3 import create_content_bucket
+from helpers.grant_permission import grant_s3_permissions
 
 
 class IkHxrCmsBackendStack(Stack):
@@ -74,6 +76,9 @@ class IkHxrCmsBackendStack(Stack):
         playlists_table = create_playlists_table(self, env_name)
         users_table = create_users_table(self, env_name)
         organizations_table = create_organizations_table(self, env_name)
+
+        # Create S3 bucket for content storage
+        content_bucket = create_content_bucket(self, env_name)
 
         # Create Lambda Authorizer with auth dependencies
         lambda_authorizer = create_lambda_function(
@@ -252,6 +257,22 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Upload Content Lambda function
+        upload_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UploadContentFunction",
+            function_name=f"Cms-UploadContent-{env_name_capitalized}",
+            handler="upload_content.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Grant S3 permissions to upload content Lambda
+        grant_s3_permissions(upload_content_lambda, content_bucket, "write")
+
         # Create Schedule Lambda functions
         create_schedule_lambda = create_lambda_function(
             scope=self,
@@ -301,7 +322,7 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
-        # Create playlist Lambda functions
+        # Create Playlist Lambda functions
         create_playlist_lambda = create_lambda_function(
             scope=self,
             construct_id="CreatePlaylistFunction",
@@ -359,7 +380,6 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/user",
             environment={
                 "USERS_TABLE_NAME": users_table.table_name,
-                "USER_POOL_ID": user_pool.user_pool_id,
                 "ENV": env_name,
             },
         )
@@ -372,7 +392,6 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/user",
             environment={
                 "USERS_TABLE_NAME": users_table.table_name,
-                "USER_POOL_ID": user_pool.user_pool_id,
                 "ENV": env_name,
             },
         )
@@ -438,22 +457,43 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
-        # Create Superadmin Lambda function
-        create_superadmin_lambda = create_lambda_function(
-            scope=self,
-            construct_id="CreateSuperadminFunction",
-            function_name=f"Cms-CreateSuperadmin-{env_name_capitalized}",
-            handler="create_initial_superadmin.handler",
-            code_path="src/lambda/cognito",
-            environment={
-                "USER_POOL_ID": user_pool.user_pool_id,
-                "USERS_TABLE_NAME": users_table.table_name,
-                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
-                "ENV": env_name,
-            },
+        # Grant table permissions to Lambda functions
+        grant_table_permissions(create_device_lambda, devices_table, "write")
+        grant_table_permissions(get_device_lambda, devices_table, "read")
+        grant_table_permissions(update_device_lambda, devices_table, "write")
+        grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
+
+        grant_table_permissions(create_content_lambda, contents_table, "write")
+        grant_table_permissions(get_content_lambda, contents_table, "read")
+        grant_table_permissions(update_content_lambda, contents_table, "write")
+        grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
+
+        grant_table_permissions(create_schedule_lambda, schedules_table, "write")
+        grant_table_permissions(get_schedule_lambda, schedules_table, "read")
+        grant_table_permissions(update_schedule_lambda, schedules_table, "write")
+        grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
+
+        grant_table_permissions(create_playlist_lambda, playlists_table, "write")
+        grant_table_permissions(get_playlist_lambda, playlists_table, "read")
+        grant_table_permissions(update_playlist_lambda, playlists_table, "write")
+        grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
+
+        grant_table_permissions(get_user_lambda, users_table, "read")
+        grant_table_permissions(update_user_lambda, users_table, "write")
+        grant_table_permissions(get_users_by_org_lambda, users_table, "read")
+
+        grant_table_permissions(
+            create_organization_lambda, organizations_table, "write"
+        )
+        grant_table_permissions(get_organization_lambda, organizations_table, "read")
+        grant_table_permissions(
+            update_organization_lambda, organizations_table, "write"
+        )
+        grant_table_permissions(
+            get_all_organizations_lambda, organizations_table, "read"
         )
 
-        # Grant Cognito permissions to Lambda functions
+        # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
             scope=self,
             construct_id="CreateCognitoUserFunction",
@@ -463,23 +503,33 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USERS_TABLE_NAME": users_table.table_name,
-                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
                 "ENV": env_name,
             },
         )
 
         invite_cognito_user_lambda = create_lambda_function(
             scope=self,
-            construct_id="InviteUserFunction",
-            function_name=f"Cms-InviteUser-{env_name_capitalized}",
+            construct_id="InviteCognitoUserFunction",
+            function_name=f"Cms-InviteCognitoUser-{env_name_capitalized}",
             handler="invite_user.handler",
             code_path="src/lambda/cognito",
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
-                "USERS_TABLE_NAME": users_table.table_name,
-                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
                 "ENV": env_name,
             },
+        )
+
+        # Grant Cognito permissions to Cognito Lambda functions
+        create_cognito_user_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminAddUserToGroup",
+                    "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
         )
 
         invite_cognito_user_lambda.add_to_role_policy(
@@ -489,86 +539,12 @@ class IkHxrCmsBackendStack(Stack):
                     "cognito-idp:AdminCreateUser",
                     "cognito-idp:AdminAddUserToGroup",
                     "cognito-idp:AdminGetUser",
-                    "cognito-idp:AdminUpdateUserAttributes",
-                    "cognito-idp:AdminSetUserPassword",
                 ],
                 resources=[user_pool.user_pool_arn],
             )
         )
 
-        create_cognito_user_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "cognito-idp:AdminCreateUser",
-                    "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminGetUser",
-                    "cognito-idp:AdminUpdateUserAttributes",
-                ],
-                resources=[user_pool.user_pool_arn],
-            )
-        )
-
-        # Grant Cognito permissions to superadmin Lambda
-        create_superadmin_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "cognito-idp:AdminCreateUser",
-                    "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminSetUserPassword",
-                    "cognito-idp:AdminGetUser",
-                ],
-                resources=[user_pool.user_pool_arn],
-            )
-        )
-
-        # Grant table permissions
-        grant_table_permissions(create_device_lambda, devices_table, "write")
-        grant_table_permissions(get_device_lambda, devices_table, "read")
-        grant_table_permissions(update_device_lambda, devices_table, "read_write")
-        grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
-
-        # Grant content table permissions
-        grant_table_permissions(create_content_lambda, contents_table, "write")
-        grant_table_permissions(get_content_lambda, contents_table, "read")
-        grant_table_permissions(update_content_lambda, contents_table, "read_write")
-        grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
-
-        # Grant schedule table permissions
-        grant_table_permissions(create_schedule_lambda, schedules_table, "write")
-        grant_table_permissions(get_schedule_lambda, schedules_table, "read")
-        grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
-        grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
-
-        # Grant playlist table permissions
-        grant_table_permissions(create_playlist_lambda, playlists_table, "write")
-        grant_table_permissions(get_playlist_lambda, playlists_table, "read")
-        grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
-        grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
-
-        # Grant user table permissions
-        grant_table_permissions(get_user_lambda, users_table, "read")
-        grant_table_permissions(update_user_lambda, users_table, "read_write")
-        grant_table_permissions(get_users_by_org_lambda, users_table, "read")
-
-        # Grant organization table permissions
-        grant_table_permissions(
-            create_organization_lambda, organizations_table, "read_write"
-        )
-        grant_table_permissions(get_organization_lambda, organizations_table, "read")
-        grant_table_permissions(
-            update_organization_lambda, organizations_table, "read_write"
-        )
-        grant_table_permissions(
-            get_all_organizations_lambda, organizations_table, "read"
-        )
-
-        # Grant user and organization permissions
-        grant_table_permissions(create_superadmin_lambda, users_table, "read_write")
-        grant_table_permissions(
-            create_superadmin_lambda, organizations_table, "read_write"
-        )
+        grant_table_permissions(create_cognito_user_lambda, users_table, "write")
 
         # Create API Gateway with Lambda Authorizer
         api = apigateway.RestApi(
@@ -576,7 +552,7 @@ class IkHxrCmsBackendStack(Stack):
             "CmsApi",
             rest_api_name=f"cms-api-{env_name}",
             description="CMS Backend API",
-            policy=create_ip_restriction_policy(env_name),
+            # Remove policy for dev environment to avoid signing issues
             deploy_options=apigateway.StageOptions(
                 stage_name=env_name or "dev",
                 throttling_rate_limit=1000,
@@ -641,6 +617,7 @@ class IkHxrCmsBackendStack(Stack):
         get_contents_by_org_integration = apigateway.LambdaIntegration(
             get_contents_by_org_lambda
         )
+        upload_content_integration = apigateway.LambdaIntegration(upload_content_lambda)
 
         # Content API methods
         content_resource.add_method(
@@ -654,6 +631,12 @@ class IkHxrCmsBackendStack(Stack):
         )
         content_org_id_resource.add_method(
             "GET", get_contents_by_org_integration, authorizer=authorizer
+        )
+
+        # Upload content endpoint
+        content_upload_resource = content_resource.add_resource("upload")
+        content_upload_resource.add_method(
+            "POST", upload_content_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF CONTENT API -------------------------------------
 
@@ -799,12 +782,6 @@ class IkHxrCmsBackendStack(Stack):
 
         login_resource.add_method("POST", login_integration)
         change_password_resource.add_method("POST", change_password_integration)
-
-        # Add superadmin setup endpoint (no authentication required)
-        # NOTE: Commented out because we don't want to create a superadmin user on deploy
-        # superadmin_resource = api.root.add_resource("setup")
-        # superadmin_integration = apigateway.LambdaIntegration(create_superadmin_lambda)
-        # superadmin_resource.add_method("POST", superadmin_integration)
 
         # Add new Cognito endpoints
         cognito_resource = api.root.add_resource("cognito")
