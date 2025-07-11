@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     RemovalPolicy,
     aws_iam as iam,
+    Duration,
 )
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
@@ -559,9 +560,23 @@ class IkHxrCmsBackendStack(Stack):
                 throttling_burst_limit=500,
             ),
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=apigateway.Cors.ALL_METHODS,
-                allow_headers=apigateway.Cors.DEFAULT_HEADERS + ["Authorization"],
+                allow_origins=["*"],  # Allow all origins for development
+                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                allow_headers=[
+                    "Content-Type",
+                    "Authorization", 
+                    "X-Amz-Date",
+                    "X-Api-Key",
+                    "X-Amz-Security-Token",
+                    "X-Amz-User-Agent",
+                    "X-Requested-With"
+                ],
+                expose_headers=[
+                    "Date",
+                    "X-Amzn-ErrorType"
+                ],
+                max_age=Duration.seconds(86400),
+                allow_credentials=False,
             ),
         )
 

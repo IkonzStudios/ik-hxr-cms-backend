@@ -7,6 +7,22 @@ from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_DEVICE_FIELDS
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+    
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Max-Age": "86400"
+    }
+
+
 def parse_request_body(
     event: Dict[str, Any]
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -28,6 +44,7 @@ def parse_request_body(
                 print(f"JSON decode error: {e}")
                 return None, {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Invalid JSON in request body"}),
                 }
         elif isinstance(event["body"], dict):
@@ -36,6 +53,7 @@ def parse_request_body(
             print(f"Unexpected body type: {type(event['body'])}")
             return None, {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Invalid request body format"}),
             }
 
@@ -44,6 +62,7 @@ def parse_request_body(
         print(f"Body is not a dictionary: {type(body)}")
         return None, {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Request body must be a JSON object"}),
         }
 
@@ -61,6 +80,7 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not body.get(field["column_name"]):
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": f'{field["name"]} is required'}),
             }
     return None
@@ -175,6 +195,7 @@ def save_device_to_db(
         print(f"Error message: {str(e)}")
         return {
             "statusCode": 409,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Device with this ID already exists"}),
         }
 
@@ -207,6 +228,7 @@ def create_success_response(device_data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "statusCode": 201,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Device created successfully",
@@ -224,7 +246,11 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
     Returns:
         Error response dictionary
     """
-    return {"statusCode": status_code, "body": json.dumps({"error": error_message})}
+    return {
+        "statusCode": status_code,
+        "headers": get_cors_headers(),
+        "body": json.dumps({"error": error_message})
+    }
 
 
 def get_device_by_id_from_db(
@@ -247,6 +273,7 @@ def get_device_by_id_from_db(
         if "Item" not in response:
             return None, {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Device not found"}),
             }
 
@@ -256,6 +283,7 @@ def get_device_by_id_from_db(
         print(f"Error getting device: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -287,6 +315,7 @@ def get_devices_by_org_id_from_db(
         print(f"Error getting devices by organization ID: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -341,10 +370,12 @@ def update_device_in_db(
         if "ConditionalCheckFailedException" in str(e):
             return {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Device not found"}),
             }
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -396,6 +427,7 @@ def create_devices_list_response(devices: list) -> Dict[str, Any]:
 
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"devices": formatted_devices, "count": len(formatted_devices)}
         ),
@@ -411,4 +443,8 @@ def create_device_response(device: Dict[str, Any]) -> Dict[str, Any]:
     """
     formatted_device = format_response_device(device)
 
-    return {"statusCode": 200, "body": json.dumps({"device": formatted_device})}
+    return {
+        "statusCode": 200,
+        "headers": get_cors_headers(),
+        "body": json.dumps({"device": formatted_device})
+    }

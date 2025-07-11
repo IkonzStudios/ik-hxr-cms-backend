@@ -7,6 +7,22 @@ from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+    
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Max-Age": "86400"
+    }
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda function to generate presigned URLs for content uploads.
@@ -43,12 +59,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not file_name:
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "file_name is required"}),
             }
 
         if not organization_id:
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "organization_id not found in token"}),
             }
 
@@ -56,6 +74,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not is_valid_filename(file_name):
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps(
                     {
                         "error": "Invalid file name. Only alphanumeric characters, spaces, dots, hyphens, and underscores are allowed"
@@ -71,6 +90,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         return {
             "statusCode": 200,
+            "headers": get_cors_headers(),
             "body": json.dumps(
                 {
                     "message": "Presigned POST generated successfully",
@@ -90,12 +110,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except json.JSONDecodeError:
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Invalid JSON in request body"}),
         }
     except Exception as e:
         print(f"Error generating presigned POST: {str(e)}")
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 

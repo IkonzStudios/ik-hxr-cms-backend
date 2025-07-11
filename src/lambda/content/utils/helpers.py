@@ -6,6 +6,22 @@ from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_CONTENT_FIELDS
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+    
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Max-Age": "86400"
+    }
+
+
 def parse_request_body(
     event: Dict[str, Any]
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -27,6 +43,7 @@ def parse_request_body(
                 print(f"JSON decode error: {e}")
                 return None, {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Invalid JSON in request body"}),
                 }
         elif isinstance(event["body"], dict):
@@ -35,6 +52,7 @@ def parse_request_body(
             print(f"Unexpected body type: {type(event['body'])}")
             return None, {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Invalid request body format"}),
             }
 
@@ -43,6 +61,7 @@ def parse_request_body(
         print(f"Body is not a dictionary: {type(body)}")
         return None, {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Request body must be a JSON object"}),
         }
 
@@ -60,6 +79,7 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not body.get(field["column_name"]):
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": f'{field["name"]} is required'}),
             }
     return None
@@ -148,6 +168,7 @@ def save_content_to_db(
         print(f"Error message: {str(e)}")
         return {
             "statusCode": 409,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Content with this ID already exists"}),
         }
 
@@ -161,6 +182,7 @@ def create_success_response(content_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {
         "statusCode": 201,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "Content created successfully", "data": content_data}
         ),
@@ -176,6 +198,7 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
     """
     return {
         "statusCode": status_code,
+        "headers": get_cors_headers(),
         "body": json.dumps({"error": error_message}),
     }
 
@@ -200,6 +223,7 @@ def get_content_by_id_from_db(
         if "Item" not in response:
             return None, {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Content not found"}),
             }
 
@@ -209,6 +233,7 @@ def get_content_by_id_from_db(
         print(f"Error getting content: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -239,6 +264,7 @@ def get_contents_by_org_id_from_db(
         print(f"Error getting contents by organization ID: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -298,10 +324,12 @@ def update_content_in_db(
         if "ConditionalCheckFailedException" in str(e):
             return {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Content not found"}),
             }
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -348,6 +376,7 @@ def create_contents_list_response(contents: list) -> Dict[str, Any]:
     """
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Contents retrieved successfully",
@@ -367,6 +396,7 @@ def create_content_response(content: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "Content retrieved successfully", "data": content}
         ),
