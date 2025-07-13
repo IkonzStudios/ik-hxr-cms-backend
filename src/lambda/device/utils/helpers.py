@@ -10,7 +10,7 @@ from .constants import REQUIRED_DEVICE_FIELDS
 def get_cors_headers() -> Dict[str, str]:
     """
     Get standard CORS headers for all responses.
-    
+
     Returns:
         Dictionary with CORS headers
     """
@@ -19,7 +19,7 @@ def get_cors_headers() -> Dict[str, str]:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Max-Age": "86400"
+        "Access-Control-Max-Age": "86400",
     }
 
 
@@ -249,7 +249,7 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
     return {
         "statusCode": status_code,
         "headers": get_cors_headers(),
-        "body": json.dumps({"error": error_message})
+        "body": json.dumps({"error": error_message}),
     }
 
 
@@ -446,5 +446,5 @@ def create_device_response(device: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
-        "body": json.dumps({"device": formatted_device})
+        "body": json.dumps({"device": formatted_device}),
     }

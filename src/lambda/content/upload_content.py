@@ -2,6 +2,7 @@ import json
 import os
 import boto3
 import base64
+import uuid
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
@@ -10,7 +11,7 @@ from botocore.exceptions import ClientError
 def get_cors_headers() -> Dict[str, str]:
     """
     Get standard CORS headers for all responses.
-    
+
     Returns:
         Dictionary with CORS headers
     """
@@ -19,7 +20,7 @@ def get_cors_headers() -> Dict[str, str]:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Max-Age": "86400"
+        "Access-Control-Max-Age": "86400",
     }
 
 
@@ -82,11 +83,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 ),
             }
 
-        # Create S3 key with organization structure
-        s3_key = f"contents/{organization_id}/{file_name}"
+        # Generate UUID for file naming
+        file_uuid = str(uuid.uuid4())
+        file_extension = get_file_extension(file_name)
+        uuid_filename = f"{file_uuid}.{file_extension}" if file_extension else file_uuid
+
+        # Create S3 key with organization structure and UUID filename
+        s3_key = f"contents/{organization_id}/{uuid_filename}"
 
         # Generate presigned POST instead of PUT
         presigned_post = generate_presigned_post(bucket_name, s3_key, file_name)
+
+        # Create file_url in the required format
+        file_id = f"contents/{organization_id}/{uuid_filename}"
 
         return {
             "statusCode": 200,
@@ -98,8 +107,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         "upload_url": presigned_post["url"],
                         "fields": presigned_post["fields"],
                         "s3_key": s3_key,
+                        "file_url": file_id,
                         "bucket_name": bucket_name,
-                        "file_name": file_name,
+                        "original_file_name": file_name,
                         "organization_id": organization_id,
                         "expires_in": 3600,  # 1 hour
                     },
@@ -139,6 +149,21 @@ def is_valid_filename(filename: str) -> bool:
     pattern = r"^[a-zA-Z0-9\s\.\-_]+$"
 
     return bool(re.match(pattern, filename))
+
+
+def get_file_extension(filename: str) -> str:
+    """
+    Extract the file extension from a filename.
+
+    Args:
+        filename: The filename to extract extension from
+
+    Returns:
+        File extension without the dot, or empty string if no extension
+    """
+    if "." in filename:
+        return filename.rsplit(".", 1)[1].lower()
+    return ""
 
 
 def generate_presigned_post(

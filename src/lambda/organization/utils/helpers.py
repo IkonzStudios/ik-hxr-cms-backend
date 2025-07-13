@@ -9,7 +9,7 @@ from .constants import REQUIRED_ORGANIZATION_FIELDS
 def get_cors_headers() -> Dict[str, str]:
     """
     Get standard CORS headers for all responses.
-    
+
     Returns:
         Dictionary with CORS headers
     """
@@ -18,7 +18,7 @@ def get_cors_headers() -> Dict[str, str]:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Max-Age": "86400"
+        "Access-Control-Max-Age": "86400",
     }
 
 

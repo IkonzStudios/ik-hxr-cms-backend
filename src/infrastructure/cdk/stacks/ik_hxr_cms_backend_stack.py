@@ -564,17 +564,14 @@ class IkHxrCmsBackendStack(Stack):
                 allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
                 allow_headers=[
                     "Content-Type",
-                    "Authorization", 
+                    "Authorization",
                     "X-Amz-Date",
                     "X-Api-Key",
                     "X-Amz-Security-Token",
                     "X-Amz-User-Agent",
-                    "X-Requested-With"
+                    "X-Requested-With",
                 ],
-                expose_headers=[
-                    "Date",
-                    "X-Amzn-ErrorType"
-                ],
+                expose_headers=["Date", "X-Amzn-ErrorType"],
                 max_age=Duration.seconds(86400),
                 allow_credentials=False,
             ),

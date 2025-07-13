@@ -3,13 +3,13 @@ import boto3
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Tuple, Optional
-from .constants import REQUIRED_CONTENT_FIELDS
+from .constants import REQUIRED_CONTENT_FIELDS, CONTENT_FIELD_TYPES, VALID_CONTENT_TYPES
 
 
 def get_cors_headers() -> Dict[str, str]:
     """
     Get standard CORS headers for all responses.
-    
+
     Returns:
         Dictionary with CORS headers
     """
@@ -18,7 +18,7 @@ def get_cors_headers() -> Dict[str, str]:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Max-Age": "86400"
+        "Access-Control-Max-Age": "86400",
     }
 
 
@@ -130,6 +130,10 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "thumbnail": body.get("thumbnail", ""),
         "title": body["title"],
         "description": body.get("description", ""),
+        "size": body.get("size", 0),
+        "duration": body.get("duration", 0.0),
+        "type": body.get("type", "other"),
+        "file_url": body.get("file_url", ""),
         "is_active": body.get("is_active", True),
         "is_deleted": body.get("is_deleted", False),
         "assigned_to": arrays["assigned_to"],
@@ -140,6 +144,10 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "created_by": body.get("created_by", ""),
         "updated_by": body.get("updated_by", ""),
     }
+
+    # Validate content type
+    if content_data["type"] not in VALID_CONTENT_TYPES:
+        content_data["type"] = "other"
 
     return content_data
 
@@ -346,6 +354,10 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "thumbnail",
         "title",
         "description",
+        "size",
+        "duration",
+        "type",
+        "file_url",
         "is_active",
         "is_deleted",
         "assigned_to",
@@ -361,6 +373,12 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
                 # Handle array fields
                 arrays = parse_array_fields({field: body[field]})
                 update_data[field] = arrays[field]
+            elif field == "type":
+                # Validate content type
+                if body[field] in VALID_CONTENT_TYPES:
+                    update_data[field] = body[field]
+                else:
+                    update_data[field] = "other"
             else:
                 update_data[field] = body[field]
 
@@ -401,3 +419,43 @@ def create_content_response(content: Dict[str, Any]) -> Dict[str, Any]:
             {"message": "Content retrieved successfully", "data": content}
         ),
     }
+
+
+def validate_content_fields(body: Dict[str, Any]) -> Optional[str]:
+    """
+    Validate content fields for proper data types.
+
+    Args:
+        body: The request body containing content fields
+
+    Returns:
+        Error message if validation fails, None if validation passes
+    """
+    for field_name, field_type in CONTENT_FIELD_TYPES.items():
+        if field_name in body:
+            value = body[field_name]
+            if value is not None and not isinstance(value, field_type):
+                try:
+                    # Try to convert to the expected type
+                    if field_type == int:
+                        body[field_name] = int(value)
+                    elif field_type == float:
+                        body[field_name] = float(value)
+                    elif field_type == str:
+                        body[field_name] = str(value)
+                except (ValueError, TypeError):
+                    return f"Field '{field_name}' must be of type {field_type.__name__}"
+
+    # Validate content type
+    if "type" in body and body["type"] not in VALID_CONTENT_TYPES:
+        return f"Content type must be one of: {', '.join(VALID_CONTENT_TYPES)}"
+
+    # Validate size (should be non-negative)
+    if "size" in body and body["size"] is not None and body["size"] < 0:
+        return "Size must be non-negative"
+
+    # Validate duration (should be non-negative)
+    if "duration" in body and body["duration"] is not None and body["duration"] < 0:
+        return "Duration must be non-negative"
+
+    return None

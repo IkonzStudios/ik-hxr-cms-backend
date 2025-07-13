@@ -4,6 +4,7 @@ from typing import Dict, Any
 from utils.helpers import (
     parse_request_body,
     validate_required_fields,
+    validate_content_fields,
     create_content_data,
     save_content_to_db,
     create_success_response,
@@ -21,6 +22,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "thumbnail": "https://example.com/thumbnail.jpg",
         "title": "Sample Video Content",
         "description": "This is a sample video for testing",
+        "size": 1048576,
+        "duration": 120.5,
+        "type": "video/mp4",
+        "file_url": "contents/org-id/uuid.mp4",
         "is_active": true,
         "is_deleted": false,
         "assigned_to": "[\"device-id-1\", \"device-id-2\"]",
@@ -49,6 +54,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         validation_error = validate_required_fields(body)
         if validation_error:
             return validation_error
+
+        # Validate content fields
+        field_validation_error = validate_content_fields(body)
+        if field_validation_error:
+            return create_error_response(400, field_validation_error)
 
         # Create content data
         content_data = create_content_data(body)

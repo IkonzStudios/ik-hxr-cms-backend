@@ -3,6 +3,7 @@ import os
 from typing import Dict, Any
 from utils.helpers import (
     parse_request_body,
+    validate_content_fields,
     get_content_by_id_from_db,
     prepare_update_data,
     update_content_in_db,
@@ -25,6 +26,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "thumbnail": "https://example.com/updated-thumbnail.jpg",
             "title": "Updated Video Content",
             "description": "Updated description",
+            "size": 2097152,
+            "duration": 180.0,
+            "type": "video/mp4",
+            "file_url": "contents/org-id/uuid.mp4",
             "is_active": false,
             "is_deleted": false,
             "assigned_to": "[\"device-id-3\", \"device-id-4\"]",
@@ -58,6 +63,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Check if body has any updateable fields
         if not body:
             return create_error_response(400, "Request body cannot be empty")
+
+        # Validate content fields
+        field_validation_error = validate_content_fields(body)
+        if field_validation_error:
+            return create_error_response(400, field_validation_error)
 
         # Prepare update data
         update_data = prepare_update_data(body)
