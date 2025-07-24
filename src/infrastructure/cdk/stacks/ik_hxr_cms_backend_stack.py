@@ -13,6 +13,7 @@ from database.dynamodb.tables.schedules import create_schedules_table
 from database.dynamodb.tables.playlists import create_playlists_table
 from database.dynamodb.tables.users import create_users_table
 from database.dynamodb.tables.organizations import create_organizations_table
+from database.dynamodb.tables.applications import create_applications_table
 from helpers.create_lambda import create_lambda_function
 from helpers.grant_permission import grant_table_permissions
 from helpers.api_policies import create_ip_restriction_policy
@@ -77,6 +78,7 @@ class IkHxrCmsBackendStack(Stack):
         playlists_table = create_playlists_table(self, env_name)
         users_table = create_users_table(self, env_name)
         organizations_table = create_organizations_table(self, env_name)
+        applications_table = create_applications_table(self, env_name)
 
         # Create S3 bucket for content storage
         content_bucket = create_content_bucket(self, env_name)
@@ -458,6 +460,55 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Application Lambda functions
+        create_application_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateApplicationFunction",
+            function_name=f"Cms-CreateApplication-{env_name_capitalized}",
+            handler="create_application.handler",
+            code_path="src/lambda/application",
+            environment={
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_application_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetApplicationByIdFunction",
+            function_name=f"Cms-GetApplicationById-{env_name_capitalized}",
+            handler="get_application_by_id.handler",
+            code_path="src/lambda/application",
+            environment={
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_application_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateApplicationByIdFunction",
+            function_name=f"Cms-UpdateApplicationById-{env_name_capitalized}",
+            handler="update_application_by_id.handler",
+            code_path="src/lambda/application",
+            environment={
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        get_applications_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetApplicationsByOrgFunction",
+            function_name=f"Cms-GetApplicationsByOrg-{env_name_capitalized}",
+            handler="get_all_applications_by_org_id.handler",
+            code_path="src/lambda/application",
+            environment={
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -492,6 +543,13 @@ class IkHxrCmsBackendStack(Stack):
         )
         grant_table_permissions(
             get_all_organizations_lambda, organizations_table, "read"
+        )
+
+        grant_table_permissions(create_application_lambda, applications_table, "write")
+        grant_table_permissions(get_application_lambda, applications_table, "read")
+        grant_table_permissions(update_application_lambda, applications_table, "write")
+        grant_table_permissions(
+            get_applications_by_org_lambda, applications_table, "read"
         )
 
         # Create Cognito Lambda functions
@@ -781,6 +839,46 @@ class IkHxrCmsBackendStack(Stack):
             "PUT", update_organization_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF ORGANIZATION API -------------------------------------
+
+        # ------------------------------------- APPLICATION API -------------------------------------
+        # API resources
+        application_resource = api.root.add_resource("application")
+        application_id_resource = application_resource.add_resource("{id}")
+        application_organization_resource = application_resource.add_resource(
+            "organization"
+        )
+        application_org_id_resource = application_organization_resource.add_resource(
+            "{orgId}"
+        )
+
+        # Lambda integrations
+        create_application_integration = apigateway.LambdaIntegration(
+            create_application_lambda
+        )
+        get_application_integration = apigateway.LambdaIntegration(
+            get_application_lambda
+        )
+        update_application_integration = apigateway.LambdaIntegration(
+            update_application_lambda
+        )
+        get_applications_by_org_integration = apigateway.LambdaIntegration(
+            get_applications_by_org_lambda
+        )
+
+        # Add application API methods
+        application_resource.add_method(
+            "POST", create_application_integration, authorizer=authorizer
+        )
+        application_id_resource.add_method(
+            "GET", get_application_integration, authorizer=authorizer
+        )
+        application_id_resource.add_method(
+            "PUT", update_application_integration, authorizer=authorizer
+        )
+        application_org_id_resource.add_method(
+            "GET", get_applications_by_org_integration, authorizer=authorizer
+        )
+        # ------------------------------------- END OF APPLICATION API -------------------------------------
 
         # Add auth endpoints (no authentication required)
         auth_resource = api.root.add_resource("auth")
