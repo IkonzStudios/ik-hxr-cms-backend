@@ -21,7 +21,6 @@ OPTIONAL_CONTENT_FIELDS = [
     "size",
     "duration",
     "type",
-    "file_url",
     "is_active",
     "is_deleted",
     "assigned_to",
@@ -35,7 +34,7 @@ CONTENT_FIELD_TYPES = {
     "size": int,  # File size in bytes
     "duration": float,  # Duration in seconds
     "type": str,  # File type/category (video, image, document, etc.)
-    "file_url": str,  # S3 file URL without prefix
+    "url": str,  # S3 file URL without prefix
 }
 
 # Valid content types

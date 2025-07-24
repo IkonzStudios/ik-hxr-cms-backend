@@ -25,7 +25,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "size": 1048576,
         "duration": 120.5,
         "type": "video/mp4",
-        "file_url": "contents/org-id/uuid.mp4",
         "is_active": true,
         "is_deleted": false,
         "assigned_to": "[\"device-id-1\", \"device-id-2\"]",
