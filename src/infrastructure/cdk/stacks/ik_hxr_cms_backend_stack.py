@@ -618,8 +618,8 @@ class IkHxrCmsBackendStack(Stack):
                 throttling_burst_limit=500,
             ),
             default_cors_preflight_options=apigateway.CorsOptions(
-                allow_origins=["*"],  # Allow all origins for development
-                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                allow_origins=["*"],
+                allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
                 allow_headers=[
                     "Content-Type",
                     "Authorization",
@@ -628,8 +628,16 @@ class IkHxrCmsBackendStack(Stack):
                     "X-Amz-Security-Token",
                     "X-Amz-User-Agent",
                     "X-Requested-With",
+                    "Origin",
+                    "Accept",
+                    "Cache-Control",
+                    "Pragma",
+                    "If-Modified-Since",
+                    "X-Forwarded-For",
+                    "X-Forwarded-Proto",
+                    "X-Forwarded-Port",
                 ],
-                expose_headers=["Date", "X-Amzn-ErrorType"],
+                expose_headers=["Date", "X-Amzn-ErrorType", "X-Amzn-RequestId", "X-Amz-Request-Id"],
                 max_age=Duration.seconds(86400),
                 allow_credentials=False,
             ),
