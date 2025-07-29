@@ -1,9 +1,12 @@
 import json
 import os
 import boto3
-import base64
+import jwt
+import requests
 from typing import Dict, Any
 from botocore.exceptions import ClientError
+from jwt import PyJWK
+import time
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -29,9 +32,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Get environment variables
         user_pool_id = os.environ.get("USER_POOL_ID")
         user_pool_client_id = os.environ.get("USER_POOL_CLIENT_ID")
+        region = os.environ.get("AWS_REGION", "us-east-2")
 
         print(f"User Pool ID: {user_pool_id}")
         print(f"Client ID: {user_pool_client_id}")
+        print(f"Region: {region}")
 
         if not user_pool_id or not user_pool_client_id:
             print("ERROR: Required environment variables not set")
@@ -56,29 +61,64 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             else f"Extracted Token: {token}"
         )
 
-        # For testing purposes, decode the token without verification
-        # In production, you should implement proper verification
+        # Verify and decode JWT token using PyJWT
         try:
-            # Decode the JWT token (without verification for now)
-            parts = token.split(".")
-            if len(parts) != 3:
-                print("ERROR: Invalid JWT token format")
+            # Get Cognito public keys
+            jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
+            print(f"Fetching JWKS from: {jwks_url}")
+            
+            jwks_response = requests.get(jwks_url, timeout=10)
+            jwks_response.raise_for_status()
+            jwks = jwks_response.json()
+            
+            # Decode token header to get the key ID
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header.get("kid")
+            
+            if not kid:
+                print("ERROR: No 'kid' found in token header")
                 return generate_policy("user", "Deny", event["methodArn"])
-
-            # Decode the payload
-            payload = parts[1]
-            # Add padding if needed
-            payload += "=" * (4 - len(payload) % 4)
-            decoded_payload = base64.b64decode(payload).decode("utf-8")
-            user_info = json.loads(decoded_payload)
-
-            print(f"Decoded token payload: {json.dumps(user_info, default=str)}")
+            
+            print(f"Token kid: {kid}")
+            
+            # Find the correct key
+            signing_key = None
+            for key in jwks["keys"]:
+                if key["kid"] == kid:
+                    # Create PyJWK object and get the key
+                    jwk = PyJWK.from_dict(key)
+                    signing_key = jwk.key
+                    break
+            
+            if not signing_key:
+                print(f"ERROR: Public key not found for kid: {kid}")
+                return generate_policy("user", "Deny", event["methodArn"])
+            
+            print("Public key found and converted")
+            
+            # Verify and decode the token
+            decoded_token = jwt.decode(
+                token,
+                signing_key,
+                algorithms=["RS256"],
+                audience=user_pool_client_id,
+                issuer=f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
+            )
+            
+            print(f"Token successfully verified and decoded")
+            print(f"Decoded token payload: {json.dumps(decoded_token, default=str)}")
 
             # Extract user information
-            user_id = user_info.get("sub")
-            email = user_info.get("email")
-            role = user_info.get("custom:role", "user")
-            organization_id = user_info.get("custom:organization_id", "")
+            user_id = decoded_token.get("sub")
+            email = decoded_token.get("email")
+            role = decoded_token.get("custom:role", "user")
+            organization_id = decoded_token.get("custom:organization_id", "")
+            
+            # Verify token expiration
+            exp = decoded_token.get("exp")
+            if exp and exp < time.time():
+                print("ERROR: Token has expired")
+                return generate_policy("user", "Deny", event["methodArn"])
 
             print(
                 f"Extracted user info - ID: {user_id}, Email: {email}, Role: {role}, Org: {organization_id}"
@@ -100,8 +140,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             return policy
 
+        except jwt.ExpiredSignatureError:
+            print("ERROR: Token has expired")
+            return generate_policy("user", "Deny", event["methodArn"])
+        except jwt.InvalidTokenError as e:
+            print(f"ERROR: Invalid token - {str(e)}")
+            return generate_policy("user", "Deny", event["methodArn"])
+        except requests.RequestException as e:
+            print(f"ERROR: Failed to fetch JWKS - {str(e)}")
+            return generate_policy("user", "Deny", event["methodArn"])
         except Exception as e:
-            print(f"Token decoding error: {str(e)}")
+            print(f"Token verification error: {str(e)}")
             return generate_policy("user", "Deny", event["methodArn"])
 
     except Exception as e:
@@ -125,7 +174,8 @@ def generate_policy(
                 {
                     "Action": "execute-api:Invoke",
                     "Effect": effect,
-                    "Resource": resource,
+                    # "Resource": resource,
+                    "Resource": "arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/*/*"
                 }
             ],
         },
