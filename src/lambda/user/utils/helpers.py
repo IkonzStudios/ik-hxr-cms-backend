@@ -8,6 +8,22 @@ from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_USER_FIELDS, VALID_USER_ROLES
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+        "Access-Control-Max-Age": "86400",
+    }
+
+
 def parse_request_body(
     event: Dict[str, Any]
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -29,6 +45,7 @@ def parse_request_body(
                 print(f"JSON decode error: {e}")
                 return None, {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Invalid JSON in request body"}),
                 }
         elif isinstance(event["body"], dict):
@@ -37,6 +54,7 @@ def parse_request_body(
             print(f"Unexpected body type: {type(event['body'])}")
             return None, {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Invalid request body format"}),
             }
 
@@ -45,6 +63,7 @@ def parse_request_body(
         print(f"Body is not a dictionary: {type(body)}")
         return None, {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Request body must be a JSON object"}),
         }
 
@@ -62,6 +81,7 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not body.get(field["column_name"]):
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": f'{field["name"]} is required'}),
             }
     return None
@@ -78,6 +98,7 @@ def validate_email_format(email: str) -> Optional[Dict[str, Any]]:
     if not re.match(email_pattern, email):
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Invalid email format"}),
         }
     return None
@@ -93,6 +114,7 @@ def validate_password_strength(password: str) -> Optional[Dict[str, Any]]:
     if len(password) < 8:
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps(
                 {"error": "Password must be at least 8 characters long"}
             ),
@@ -101,12 +123,14 @@ def validate_password_strength(password: str) -> Optional[Dict[str, Any]]:
     if not re.search(r"[A-Za-z]", password):
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Password must contain at least one letter"}),
         }
 
     if not re.search(r"\d", password):
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Password must contain at least one number"}),
         }
 
@@ -123,6 +147,7 @@ def validate_user_role(role: str) -> Optional[Dict[str, Any]]:
     if role not in VALID_USER_ROLES:
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps(
                 {
                     "error": f"Invalid role. Must be one of: {', '.join(VALID_USER_ROLES)}"
@@ -196,6 +221,7 @@ def save_user_to_db(
         if email_response["Items"]:
             return {
                 "statusCode": 409,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "User with this email already exists"}),
             }
 
@@ -208,6 +234,7 @@ def save_user_to_db(
         print(f"Error message: {str(e)}")
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -225,6 +252,7 @@ def create_success_response(user_data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "statusCode": 201,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "User created successfully", "data": response_data}
         ),
@@ -240,6 +268,7 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
     """
     return {
         "statusCode": status_code,
+        "headers": get_cors_headers(),
         "body": json.dumps({"error": error_message}),
     }
 
@@ -264,6 +293,7 @@ def get_user_by_id_from_db(
         if "Item" not in response:
             return None, {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "User not found"}),
             }
 
@@ -273,6 +303,7 @@ def get_user_by_id_from_db(
         print(f"Error getting user: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -303,6 +334,7 @@ def get_users_by_org_id_from_db(
         print(f"Error getting users by organization ID: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -333,6 +365,7 @@ def update_user_in_db(
                 if item["id"] != user_id:
                     return {
                         "statusCode": 409,
+                        "headers": get_cors_headers(),
                         "body": json.dumps(
                             {"error": "User with this email already exists"}
                         ),
@@ -387,10 +420,12 @@ def update_user_in_db(
         if "ConditionalCheckFailedException" in str(e):
             return {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "User not found"}),
             }
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -440,6 +475,7 @@ def create_users_list_response(users: list) -> Dict[str, Any]:
 
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Users retrieved successfully",
@@ -463,6 +499,7 @@ def create_user_response(user: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "User retrieved successfully", "data": safe_user}
         ),

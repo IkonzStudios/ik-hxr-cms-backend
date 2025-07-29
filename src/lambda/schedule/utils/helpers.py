@@ -6,6 +6,22 @@ from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_SCHEDULE_FIELDS
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+        "Access-Control-Max-Age": "86400",
+    }
+
+
 def parse_request_body(
     event: Dict[str, Any]
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -27,6 +43,7 @@ def parse_request_body(
                 print(f"JSON decode error: {e}")
                 return None, {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Invalid JSON in request body"}),
                 }
         elif isinstance(event["body"], dict):
@@ -35,6 +52,7 @@ def parse_request_body(
             print(f"Unexpected body type: {type(event['body'])}")
             return None, {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Invalid request body format"}),
             }
 
@@ -43,6 +61,7 @@ def parse_request_body(
         print(f"Body is not a dictionary: {type(body)}")
         return None, {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Request body must be a JSON object"}),
         }
 
@@ -60,6 +79,7 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not body.get(field["column_name"]):
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": f'{field["name"]} is required'}),
             }
     return None
@@ -80,6 +100,7 @@ def validate_datetime_format(
     except ValueError:
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps(
                 {
                     "error": f"{field_name} must be in ISO 8601 format (e.g., '2024-01-15T10:30:00Z')"
@@ -102,12 +123,14 @@ def validate_schedule_times(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if start_at >= end_at:
             return {
                 "statusCode": 400,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "start_at must be before end_at"}),
             }
         return None
     except ValueError:
         return {
             "statusCode": 400,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Invalid datetime format"}),
         }
 
@@ -194,6 +217,7 @@ def save_schedule_to_db(
         print(f"Error message: {str(e)}")
         return {
             "statusCode": 409,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Schedule with this ID already exists"}),
         }
 
@@ -207,6 +231,7 @@ def create_success_response(schedule_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {
         "statusCode": 201,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "Schedule created successfully", "data": schedule_data}
         ),
@@ -222,6 +247,7 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
     """
     return {
         "statusCode": status_code,
+        "headers": get_cors_headers(),
         "body": json.dumps({"error": error_message}),
     }
 
@@ -246,6 +272,7 @@ def get_schedule_by_id_from_db(
         if "Item" not in response:
             return None, {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Schedule not found"}),
             }
 
@@ -255,6 +282,7 @@ def get_schedule_by_id_from_db(
         print(f"Error getting schedule: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -285,6 +313,7 @@ def get_schedules_by_org_id_from_db(
         print(f"Error getting schedules by organization ID: {str(e)}")
         return None, {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -344,10 +373,12 @@ def update_schedule_in_db(
         if "ConditionalCheckFailedException" in str(e):
             return {
                 "statusCode": 404,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Schedule not found"}),
             }
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 
@@ -393,6 +424,7 @@ def create_schedules_list_response(schedules: list) -> Dict[str, Any]:
     """
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Schedules retrieved successfully",
@@ -412,6 +444,7 @@ def create_schedule_response(schedule: Dict[str, Any]) -> Dict[str, Any]:
     """
     return {
         "statusCode": 200,
+        "headers": get_cors_headers(),
         "body": json.dumps(
             {"message": "Schedule retrieved successfully", "data": schedule}
         ),
