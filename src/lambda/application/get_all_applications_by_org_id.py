@@ -15,7 +15,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Expected event structure:
     {
         "pathParameters": {
-            "org_id": "123e4567-e89b-12d3-a456-426614174000"
+            "orgId": "123e4567-e89b-12d3-a456-426614174000"
         }
     }
     """
@@ -31,7 +31,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Get organization ID from path parameters
         path_parameters = event.get("pathParameters", {})
-        org_id = path_parameters.get("org_id")
+        org_id = path_parameters.get("orgId")
 
         if not org_id:
             return create_error_response(400, "Organization ID is required")
