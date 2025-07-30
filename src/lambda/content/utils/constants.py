@@ -31,10 +31,11 @@ OPTIONAL_CONTENT_FIELDS = [
 
 # Content field types for validation
 CONTENT_FIELD_TYPES = {
-    "size": int,  # File size in bytes
-    "duration": float,  # Duration in seconds
+    "size": str,  # File size in bytes
+    "duration": str,  # Duration in seconds
     "type": str,  # File type/category (video, image, document, etc.)
     "url": str,  # S3 file URL without prefix
+    "is_deleted": bool,  # Soft delete flag
 }
 
 # Valid content types

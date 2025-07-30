@@ -180,6 +180,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "end_at": body["end_at"],
         "loop": body.get("loop", False),
         "is_active": body.get("is_active", True),
+        "is_deleted": body.get("is_deleted", False),
         "assigned_to": arrays["assigned_to"],
         "contents": arrays["contents"],
         "playlists": arrays["playlists"],
@@ -399,6 +400,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "contents",
         "playlists",
         "updated_by",
+        "is_deleted",
     ]
 
     update_data = {}

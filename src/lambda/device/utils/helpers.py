@@ -164,10 +164,15 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "applications": arrays["applications"],
         "contents": arrays["contents"],
         "status": body.get("status", "active"),
+        "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,
         "last_updated": current_time,
         "storage_left": storage["storage_left"],
         "storage_consumed": storage["storage_consumed"],
+        "created_at": current_time,
+        "updated_at": current_time,
+        "created_by": body.get("created_by", ""),
+        "updated_by": body.get("updated_by", ""),
     }
 
     return device_data

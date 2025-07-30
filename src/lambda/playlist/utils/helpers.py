@@ -130,6 +130,7 @@ def create_playlist_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "description": body.get("description", ""),
         "organization_id": body["organization_id"],
         "contents": arrays["contents"],
+        "is_deleted": body.get("is_deleted", False),
         "created_at": current_time,
         "updated_at": current_time,
         "created_by": body.get("created_by", ""),
@@ -341,6 +342,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "description",
         "contents",
         "updated_by",
+        "is_deleted",
     ]
 
     update_data = {}

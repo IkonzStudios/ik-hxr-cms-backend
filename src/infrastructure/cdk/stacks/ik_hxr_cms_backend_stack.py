@@ -512,26 +512,26 @@ class IkHxrCmsBackendStack(Stack):
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
-        grant_table_permissions(update_device_lambda, devices_table, "write")
+        grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
 
         grant_table_permissions(create_content_lambda, contents_table, "write")
         grant_table_permissions(get_content_lambda, contents_table, "read")
-        grant_table_permissions(update_content_lambda, contents_table, "write")
+        grant_table_permissions(update_content_lambda, contents_table, "read_write")
         grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
 
         grant_table_permissions(create_schedule_lambda, schedules_table, "write")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
-        grant_table_permissions(update_schedule_lambda, schedules_table, "write")
+        grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
 
         grant_table_permissions(create_playlist_lambda, playlists_table, "write")
         grant_table_permissions(get_playlist_lambda, playlists_table, "read")
-        grant_table_permissions(update_playlist_lambda, playlists_table, "write")
+        grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
         grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
 
         grant_table_permissions(get_user_lambda, users_table, "read")
-        grant_table_permissions(update_user_lambda, users_table, "write")
+        grant_table_permissions(update_user_lambda, users_table, "read_write")
         grant_table_permissions(get_users_by_org_lambda, users_table, "read")
 
         grant_table_permissions(
@@ -539,7 +539,7 @@ class IkHxrCmsBackendStack(Stack):
         )
         grant_table_permissions(get_organization_lambda, organizations_table, "read")
         grant_table_permissions(
-            update_organization_lambda, organizations_table, "write"
+            update_organization_lambda, organizations_table, "read_write"
         )
         grant_table_permissions(
             get_all_organizations_lambda, organizations_table, "read"
@@ -547,7 +547,7 @@ class IkHxrCmsBackendStack(Stack):
 
         grant_table_permissions(create_application_lambda, applications_table, "write")
         grant_table_permissions(get_application_lambda, applications_table, "read")
-        grant_table_permissions(update_application_lambda, applications_table, "write")
+        grant_table_permissions(update_application_lambda, applications_table, "read_write")
         grant_table_permissions(
             get_applications_by_org_lambda, applications_table, "read"
         )

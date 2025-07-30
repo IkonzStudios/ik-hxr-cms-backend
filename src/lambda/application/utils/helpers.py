@@ -7,6 +7,7 @@ from .constants import (
     REQUIRED_APPLICATION_FIELDS,
     APPLICATION_FIELD_TYPES,
     VALID_PLATFORMS,
+    VALID_STATUS,
 )
 
 
@@ -103,10 +104,14 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
     # Create application data dictionary
     application_data = {
         "id": application_id,
+        "name": body["name"],
+        "description": body.get("description", ""),
+        "status": body.get("status", "pending"),
         "logo": body.get("logo", ""),
         "version": body["version"],
         "platform": body["platform"],
         "organization_id": body["organization_id"],
+        "is_deleted": body.get("is_deleted", False),
         "created_at": current_time,
         "updated_at": current_time,
         "created_by": body.get("created_by", ""),
@@ -314,10 +319,14 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary with valid update fields
     """
     allowed_fields = [
+        "name",
+        "description",
+        "status",
         "logo",
         "version",
         "platform",
         "updated_by",
+        "is_deleted",
     ]
 
     update_data = {}
@@ -396,5 +405,9 @@ def validate_application_fields(body: Dict[str, Any]) -> Optional[str]:
     # Validate platform
     if "platform" in body and body["platform"] not in VALID_PLATFORMS:
         return f"Platform must be one of: {', '.join(VALID_PLATFORMS)}"
+
+    # Validate status
+    if "status" in body and body["status"] not in VALID_STATUS:
+        return f"Status must be one of: {', '.join(VALID_STATUS)}"
 
     return None

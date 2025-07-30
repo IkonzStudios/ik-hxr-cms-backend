@@ -444,6 +444,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "role",
         "password",
         "updated_by",
+        "is_deleted",
     ]
 
     update_data = {}

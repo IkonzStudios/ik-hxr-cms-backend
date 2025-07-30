@@ -2,6 +2,7 @@ import json
 import boto3
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_CONTENT_FIELDS, CONTENT_FIELD_TYPES, VALID_CONTENT_TYPES
 
@@ -128,10 +129,10 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "id": content_id,
         "url": body["url"],
         "thumbnail": body.get("thumbnail", ""),
-        "title": body["title"],
+        "title": body["title"], 
         "description": body.get("description", ""),
-        "size": body.get("size", 0),
-        "duration": body.get("duration", 0.0),
+        "size": body.get("size", "0"),
+        "duration": body.get("duration", "0"),
         "type": body.get("type", "other"),
         "is_active": body.get("is_active", True),
         "is_deleted": body.get("is_deleted", False),
@@ -361,6 +362,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "assigned_to",
         "playlists",
         "updated_by",
+        "is_deleted",
     ]
 
     update_data = {}
@@ -447,13 +449,5 @@ def validate_content_fields(body: Dict[str, Any]) -> Optional[str]:
     # Validate content type
     if "type" in body and body["type"] not in VALID_CONTENT_TYPES:
         return f"Content type must be one of: {', '.join(VALID_CONTENT_TYPES)}"
-
-    # Validate size (should be non-negative)
-    if "size" in body and body["size"] is not None and body["size"] < 0:
-        return "Size must be non-negative"
-
-    # Validate duration (should be non-negative)
-    if "duration" in body and body["duration"] is not None and body["duration"] < 0:
-        return "Duration must be non-negative"
 
     return None

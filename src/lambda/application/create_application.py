@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from utils.helpers import (
     parse_request_body,
     validate_required_fields,
@@ -18,6 +18,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Expected event structure:
     {
+        "name": "My Application",
+        "description": "Application description",
+        "status": "active",
         "logo": "https://example.com/logo.png",
         "version": "1.0.0",
         "platform": "android",
