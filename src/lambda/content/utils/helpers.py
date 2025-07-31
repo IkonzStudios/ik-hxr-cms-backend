@@ -385,6 +385,25 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
     return update_data
 
 
+def format_response_content(content_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Format content data for JSON response by converting Decimal to appropriate types.
+
+    Returns:
+        Content data with Decimal values converted to proper types
+    """
+    response_content = content_data.copy()
+
+    # Convert numeric fields that might be Decimal objects to strings
+    # (matching the expected string type defined in constants.py)
+    if response_content.get("size") is not None:
+        response_content["size"] = str(response_content["size"])
+    if response_content.get("duration") is not None:
+        response_content["duration"] = str(response_content["duration"])
+
+    return response_content
+
+
 def create_contents_list_response(contents: list) -> Dict[str, Any]:
     """
     Create a response with list of contents.
@@ -392,14 +411,20 @@ def create_contents_list_response(contents: list) -> Dict[str, Any]:
     Returns:
         Response dictionary with contents list
     """
+    # Format contents for response to handle Decimal serialization
+    formatted_contents = []
+    for content in contents:
+        formatted_content = format_response_content(content)
+        formatted_contents.append(formatted_content)
+
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Contents retrieved successfully",
-                "data": contents,
-                "count": len(contents),
+                "data": formatted_contents,
+                "count": len(formatted_contents),
             }
         ),
     }
