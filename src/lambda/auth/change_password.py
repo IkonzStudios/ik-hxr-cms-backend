@@ -1,6 +1,7 @@
 import json
 import os
 import boto3
+from datetime import datetime
 from typing import Dict, Any
 from botocore.exceptions import ClientError
 
@@ -69,6 +70,32 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     attr["Name"]: attr["Value"] for attr in user_info["UserAttributes"]
                 }
 
+                # Update user status in DynamoDB
+                users_table_name = os.environ.get("USERS_TABLE_NAME")
+                if users_table_name:
+                    try:
+                        dynamodb = boto3.resource("dynamodb")
+                        users_table = dynamodb.Table(users_table_name)
+                        
+                        # Update user status to CONFIRMED
+                        users_table.update_item(
+                            Key={
+                                "id": user_attributes.get("sub")  # Use the cognito sub as the user ID
+                            },
+                            UpdateExpression="SET #status = :status, updated_at = :updated_at",
+                            ExpressionAttributeNames={
+                                "#status": "status"
+                            },
+                            ExpressionAttributeValues={
+                                ":status": "CONFIRMED",
+                                ":updated_at": datetime.now().isoformat()
+                            }
+                        )
+                        print(f"User status updated to CONFIRMED for user: {body['email']}")
+                    except Exception as e:
+                        print(f"Error updating user status: {str(e)}")
+                        # Don't fail the password change if DynamoDB update fails
+                
                 return {
                     "statusCode": 200,
                     "body": json.dumps(
@@ -86,6 +113,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                                 "organization_id": user_attributes.get(
                                     "custom:organization_id"
                                 ),
+                                "status": "CONFIRMED",  # ← Add this to response
                             },
                         }
                     ),

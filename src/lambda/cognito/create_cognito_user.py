@@ -17,9 +17,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "email": "user@example.com",
             "first_name": "John",
             "last_name": "Doe",
-            "role": "admin",
-            "organization_id": "org-123",
-            "created_by": "superadmin-456"
+            "role": "user",
+            // For superadmin users creating a new organization:
+            "organization_name": "Acme Corp", 
+            "organization_license": "LICENSE-123"
+            // For admin users, their organization_id is used automatically
+        },
+        "requestContext": {
+            "authorizer": {
+                "user_id": "current-user-id",
+                "role": "superadmin|admin",
+                "organization_id": "current-user-org-id"
+            }
         }
     }
     """
@@ -28,9 +37,24 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Get environment variables
         user_pool_id = os.environ.get("USER_POOL_ID")
         users_table_name = os.environ.get("USERS_TABLE_NAME")
+        organizations_table_name = os.environ.get("ORGANIZATIONS_TABLE_NAME")
 
-        if not user_pool_id or not users_table_name:
+        if not user_pool_id or not users_table_name or not organizations_table_name:
             raise ValueError("Required environment variables not set")
+
+        # Extract current user context from authorizer
+        request_context = event.get("requestContext", {})
+        authorizer = request_context.get("authorizer", {})
+        
+        current_user_id = authorizer.get("user_id")
+        current_user_role = authorizer.get("role")
+        current_user_org_id = authorizer.get("organization_id")
+
+        if not current_user_id or not current_user_role:
+            return {
+                "statusCode": 401,
+                "body": json.dumps({"error": "Unauthorized: Invalid user context"}),
+            }
 
         # Parse request body
         body = json.loads(event.get("body", "{}"))
@@ -41,7 +65,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "first_name",
             "last_name",
             "role",
-            "organization_id",
         ]
         for field in required_fields:
             if field not in body:
@@ -49,6 +72,71 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     "statusCode": 400,
                     "body": json.dumps({"error": f"Missing required field: {field}"}),
                 }
+
+        # Determine organization_id based on current user's role
+        if current_user_role == "superadmin":
+            # For superadmin, create a new organization if not provided
+            if "organization_name" not in body or "organization_license" not in body:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "Superadmin must provide organization_name and organization_license"}),
+                }
+            
+            # Create new organization
+            organization_id = str(uuid.uuid4())
+            current_time = datetime.now().isoformat()
+            organization_data = {
+                "id": organization_id,
+                "name": body["organization_name"],
+                "license": body["organization_license"],
+                "created_at": current_time,
+                "updated_at": current_time,
+                "created_by": current_user_id,
+                "updated_by": current_user_id,
+            }
+            
+            # Save organization to DynamoDB
+            dynamodb = boto3.resource("dynamodb")
+            organizations_table = dynamodb.Table(organizations_table_name)
+            
+            # Check if license already exists
+            license_response = organizations_table.scan(
+                FilterExpression="license = :license",
+                ExpressionAttributeValues={":license": organization_data["license"]},
+            )
+            
+            if license_response["Items"]:
+                return {
+                    "statusCode": 409,
+                    "body": json.dumps({"error": "Organization with this license already exists"}),
+                }
+            
+            organizations_table.put_item(
+                Item=organization_data,
+                ConditionExpression="attribute_not_exists(id)"
+            )
+            
+            body["organization_id"] = organization_id
+            
+        elif current_user_role == "admin":
+            if body["role"] == "superadmin":
+                return {
+                    "statusCode": 403,
+                    "body": json.dumps({"error": "Admin users cannot create superadmin users"}),
+                }
+            
+            # For admin, use their organization_id
+            if not current_user_org_id:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "Admin user must have an organization_id"}),
+                }
+            body["organization_id"] = current_user_org_id
+        else:
+            return {
+                "statusCode": 403,
+                "body": json.dumps({"error": "Only superadmin and admin users can create users"}),
+            }
 
         # Create Cognito user
         cognito_client = boto3.client("cognito-idp")
@@ -67,7 +155,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 {"Name": "email_verified", "Value": "true"},
                 {"Name": "custom:organization_id", "Value": body["organization_id"]},
                 {"Name": "custom:role", "Value": body["role"]},
-                {"Name": "custom:created_by", "Value": body.get("created_by", "")},
+                {"Name": "custom:created_by", "Value": current_user_id},
             ],
             TemporaryPassword=temp_password,
             MessageAction="SUPPRESS",  # Don't send welcome email automatically
@@ -94,15 +182,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "organization_id": body["organization_id"],
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
-            "created_by": body.get("created_by", ""),
-            "updated_by": body.get("created_by", ""),
+            "created_by": current_user_id,
+            "updated_by": current_user_id,
             "status": "FORCE_CHANGE_PASSWORD",
         }
 
         # Save to DynamoDB
         dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table(users_table_name)
-        table.put_item(Item=user_data)
+        users_table = dynamodb.Table(users_table_name)
+        users_table.put_item(Item=user_data)
+
+        # TODO: Send invitation email with temporary password
+        # This would typically be done through SES or another email service
+        # Include organization details in the email for superadmin created users
 
         return {
             "statusCode": 201,

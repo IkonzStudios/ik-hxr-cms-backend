@@ -133,6 +133,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "USERS_TABLE_NAME": users_table.table_name,
                 "ENV": env_name,
             },
             layers=[auth_dependencies_layer, common_dependencies_layer],
@@ -562,18 +563,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USERS_TABLE_NAME": users_table.table_name,
-                "ENV": env_name,
-            },
-        )
-
-        invite_cognito_user_lambda = create_lambda_function(
-            scope=self,
-            construct_id="InviteCognitoUserFunction",
-            function_name=f"Cms-InviteCognitoUser-{env_name_capitalized}",
-            handler="invite_user.handler",
-            code_path="src/lambda/cognito",
-            environment={
-                "USER_POOL_ID": user_pool.user_pool_id,
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
                 "ENV": env_name,
             },
         )
@@ -591,19 +581,10 @@ class IkHxrCmsBackendStack(Stack):
             )
         )
 
-        invite_cognito_user_lambda.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "cognito-idp:AdminCreateUser",
-                    "cognito-idp:AdminAddUserToGroup",
-                    "cognito-idp:AdminGetUser",
-                ],
-                resources=[user_pool.user_pool_arn],
-            )
-        )
+        grant_table_permissions(create_cognito_user_lambda, users_table, "read_write")
+        grant_table_permissions(create_cognito_user_lambda, organizations_table, "read_write")
+        grant_table_permissions(change_password_lambda, users_table, "read_write")
 
-        grant_table_permissions(create_cognito_user_lambda, users_table, "write")
 
         # Create API Gateway with Lambda Authorizer
         api = apigateway.RestApi(
@@ -904,18 +885,11 @@ class IkHxrCmsBackendStack(Stack):
         # Add new Cognito endpoints
         cognito_resource = api.root.add_resource("cognito")
         create_user_resource = cognito_resource.add_resource("create")
-        invite_user_resource = cognito_resource.add_resource("invite")
 
         create_user_integration = apigateway.LambdaIntegration(
             create_cognito_user_lambda
         )
-        invite_user_integration = apigateway.LambdaIntegration(
-            invite_cognito_user_lambda
-        )
 
         create_user_resource.add_method(
             "POST", create_user_integration, authorizer=authorizer
-        )
-        invite_user_resource.add_method(
-            "POST", invite_user_integration, authorizer=authorizer
         )
