@@ -192,7 +192,11 @@ def create_success_response(content_data: Dict[str, Any]) -> Dict[str, Any]:
         "statusCode": 201,
         "headers": get_cors_headers(),
         "body": json.dumps(
-            {"message": "Content created successfully", "data": content_data}
+            {
+                "message": "Content created successfully",
+                "content_id": content_data["id"],
+                "content": content_data,
+            }
         ),
     }
 
