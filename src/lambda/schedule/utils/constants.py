@@ -1,6 +1,10 @@
 # Required fields for schedule creation
 REQUIRED_SCHEDULE_FIELDS = [
     {
+        "name": "Title",
+        "column_name": "title",
+    },
+    {
         "name": "Start At",
         "column_name": "start_at",
     },
@@ -25,6 +29,7 @@ OPTIONAL_SCHEDULE_FIELDS = [
 
 # Schedule field types for validation
 SCHEDULE_FIELD_TYPES = {
+    "title": str,  # Schedule title/name
     "start_at": str,  # ISO 8601 datetime string
     "end_at": str,  # ISO 8601 datetime string
     "loop": bool,  # Whether to loop the schedule

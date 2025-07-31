@@ -176,6 +176,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
     # Create schedule data dictionary
     schedule_data = {
         "id": schedule_id,
+        "title": body.get("title", ""),
         "start_at": body["start_at"],
         "end_at": body["end_at"],
         "loop": body.get("loop", False),
@@ -392,6 +393,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary with valid update fields
     """
     allowed_fields = [
+        "title",
         "start_at",
         "end_at",
         "loop",

@@ -23,6 +23,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "id": "schedule-uuid"
         },
         "body": {
+            "title": "Updated Schedule Title",
             "start_at": "2024-01-15T09:00:00Z",
             "end_at": "2024-01-15T19:00:00Z",
             "loop": false,

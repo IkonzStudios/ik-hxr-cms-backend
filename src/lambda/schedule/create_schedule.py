@@ -19,6 +19,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Expected event structure:
     {
+        "title": "My Schedule Title",
         "start_at": "2024-01-15T10:00:00Z",
         "end_at": "2024-01-15T18:00:00Z",
         "loop": true,
