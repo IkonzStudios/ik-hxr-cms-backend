@@ -7,6 +7,22 @@ from typing import Dict, Any
 from botocore.exceptions import ClientError
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+        "Access-Control-Max-Age": "86400",
+    }
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda function to create a user in Cognito User Pool.
@@ -53,6 +69,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not current_user_id or not current_user_role:
             return {
                 "statusCode": 401,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Unauthorized: Invalid user context"}),
             }
 
@@ -70,6 +87,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if field not in body:
                 return {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": f"Missing required field: {field}"}),
                 }
 
@@ -79,6 +97,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if "organization_name" not in body or "organization_license" not in body:
                 return {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Superadmin must provide organization_name and organization_license"}),
                 }
             
@@ -108,6 +127,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if license_response["Items"]:
                 return {
                     "statusCode": 409,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Organization with this license already exists"}),
                 }
             
@@ -122,6 +142,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if body["role"] == "superadmin":
                 return {
                     "statusCode": 403,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Admin users cannot create superadmin users"}),
                 }
             
@@ -129,12 +150,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if not current_user_org_id:
                 return {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Admin user must have an organization_id"}),
                 }
             body["organization_id"] = current_user_org_id
         else:
             return {
                 "statusCode": 403,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Only superadmin and admin users can create users"}),
             }
 
@@ -198,6 +221,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         return {
             "statusCode": 201,
+            "headers": get_cors_headers(),
             "body": json.dumps(
                 {
                     "message": "User created successfully",
@@ -221,18 +245,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if error_code == "UsernameExistsException":
             return {
                 "statusCode": 409,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "User with this email already exists"}),
             }
         else:
             print(f"Cognito error: {str(e)}")
             return {
                 "statusCode": 500,
+                "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Failed to create user in Cognito"}),
             }
     except Exception as e:
         print(f"Error creating user: {str(e)}")
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
 

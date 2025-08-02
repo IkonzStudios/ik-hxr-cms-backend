@@ -6,6 +6,22 @@ from typing import Dict, Any
 from botocore.exceptions import ClientError
 
 
+def get_cors_headers() -> Dict[str, str]:
+    """
+    Get standard CORS headers for all responses.
+
+    Returns:
+        Dictionary with CORS headers
+    """
+    return {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+        "Access-Control-Max-Age": "86400",
+    }
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda function to handle password change for new users.
@@ -37,6 +53,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if field not in body:
                 return {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": f"Missing required field: {field}"}),
                 }
 
@@ -98,6 +115,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 
                 return {
                     "statusCode": 200,
+                    "headers": get_cors_headers(),
                     "body": json.dumps(
                         {
                             "message": "Password changed successfully",
@@ -124,11 +142,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if error_code == "NotAuthorizedException":
                 return {
                     "statusCode": 401,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Invalid session or credentials"}),
                 }
             elif error_code == "InvalidPasswordException":
                 return {
                     "statusCode": 400,
+                    "headers": get_cors_headers(),
                     "body": json.dumps(
                         {"error": "Password does not meet requirements"}
                     ),
@@ -137,6 +157,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"Password change error: {str(e)}")
                 return {
                     "statusCode": 500,
+                    "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Password change failed"}),
                 }
 
@@ -144,5 +165,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         print(f"Password change error: {str(e)}")
         return {
             "statusCode": 500,
+            "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
