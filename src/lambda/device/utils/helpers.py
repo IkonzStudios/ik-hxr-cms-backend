@@ -148,12 +148,12 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
     storage = convert_storage_values(body)
 
     # Generate device ID and timestamps
-    device_id = str(uuid.uuid4())
+    # device_id = str(uuid.uuid4())
     current_time = datetime.now().isoformat()
 
     # Create device data dictionary
     device_data = {
-        "id": device_id,
+        "id": body["id"],
         "name": body["name"],
         "organization_id": body["organization_id"],
         "description": body.get("description"),

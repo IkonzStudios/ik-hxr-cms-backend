@@ -1,6 +1,10 @@
 # Required fields for device creation
 REQUIRED_DEVICE_FIELDS = [
     {
+        "name": "ID",
+        "column_name": "id",
+    },
+    {
         "name": "Name",
         "column_name": "name",
     },
@@ -29,6 +33,7 @@ OPTIONAL_DEVICE_FIELDS = [
 
 # Device field types for validation
 DEVICE_FIELD_TYPES = {
+    "id": str,  # Device ID
     "name": str,  # Device name
     "description": str,  # Device description
     "model": str,  # Device model

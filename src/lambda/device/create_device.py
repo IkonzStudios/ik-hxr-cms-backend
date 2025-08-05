@@ -17,6 +17,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     Expected event structure:
     {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
         "name": "Device Name",
         "description": "Device Description",
         "organization_id": "123e4567-e89b-12d3-a456-426614174000",
