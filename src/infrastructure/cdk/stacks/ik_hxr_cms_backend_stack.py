@@ -510,6 +510,49 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create IoT Lambda functions
+        configure_device_volume_lambda = create_lambda_function(
+            scope=self,
+            construct_id="ConfigureDeviceVolumeFunction",
+            function_name=f"Cms-ConfigureDeviceVolume-{env_name_capitalized}",
+            handler="configure_device_volume.handler",
+            code_path="src/lambda/iot",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        configure_device_brightness_lambda = create_lambda_function(
+            scope=self,
+            construct_id="ConfigureDeviceBrightnessFunction",
+            function_name=f"Cms-ConfigureDeviceBrightness-{env_name_capitalized}",
+            handler="configure_device_brightness.handler",
+            code_path="src/lambda/iot",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        configure_device_wifi_lambda = create_lambda_function(
+            scope=self,
+            construct_id="ConfigureDeviceWifiFunction",
+            function_name=f"Cms-ConfigureDeviceWifi-{env_name_capitalized}",
+            handler="configure_device_wifi.handler",
+            code_path="src/lambda/iot",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -552,6 +595,11 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(
             get_applications_by_org_lambda, applications_table, "read"
         )
+
+        # Grant table permissions to IoT Lambda functions
+        grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
+        grant_table_permissions(configure_device_brightness_lambda, devices_table, "read")
+        grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
 
         # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
@@ -893,3 +941,24 @@ class IkHxrCmsBackendStack(Stack):
         create_user_resource.add_method(
             "POST", create_user_integration, authorizer=authorizer
         )
+
+        # ------------------------------------- IOT API -------------------------------------
+        # API resources
+        iot_resource = api.root.add_resource("iot")
+        device_config_resource = iot_resource.add_resource("device")
+        
+        # Volume configuration
+        volume_resource = device_config_resource.add_resource("volume")
+        volume_integration = apigateway.LambdaIntegration(configure_device_volume_lambda)
+        volume_resource.add_method("POST", volume_integration, authorizer=authorizer)
+        
+        # Brightness configuration
+        brightness_resource = device_config_resource.add_resource("brightness")
+        brightness_integration = apigateway.LambdaIntegration(configure_device_brightness_lambda)
+        brightness_resource.add_method("POST", brightness_integration, authorizer=authorizer)
+        
+        # WiFi configuration
+        wifi_resource = device_config_resource.add_resource("wifi")
+        wifi_integration = apigateway.LambdaIntegration(configure_device_wifi_lambda)
+        wifi_resource.add_method("POST", wifi_integration, authorizer=authorizer)
+        # ------------------------------------- END OF IOT API -------------------------------------
