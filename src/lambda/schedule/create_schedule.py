@@ -10,6 +10,7 @@ from utils.helpers import (
     save_schedule_to_db,
     create_success_response,
     create_error_response,
+    schedule_content_on_iot_devices,
 )
 
 
@@ -34,10 +35,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
 
     try:
-        # Get table name from environment variable
-        table_name = os.environ.get("SCHEDULES_TABLE_NAME")
-        if not table_name:
+        # Get environment variables
+        schedules_table_name = os.environ.get("SCHEDULES_TABLE_NAME")
+        playlists_table_name = os.environ.get("PLAYLISTS_TABLE_NAME")
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        iot_schedule_api_url = os.environ.get("IOT_SCHEDULE_API_URL")
+        default_s3_bucket = os.environ.get("CONTENT_BUCKET_NAME")
+        
+        if not schedules_table_name:
             raise ValueError("SCHEDULES_TABLE_NAME environment variable not set")
+        if not playlists_table_name:
+            raise ValueError("PLAYLISTS_TABLE_NAME environment variable not set")
+        if not contents_table_name:
+            raise ValueError("CONTENTS_TABLE_NAME environment variable not set")
+        if not iot_schedule_api_url:
+            raise ValueError("IOT_SCHEDULE_API_URL environment variable not set")
+        if not default_s3_bucket:
+            raise ValueError("CONTENT_BUCKET_NAME environment variable not set")
 
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
@@ -67,12 +81,61 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         schedule_data = create_schedule_data(body)
 
         # Save to database
-        save_error = save_schedule_to_db(schedule_data, table_name)
+        save_error = save_schedule_to_db(schedule_data, schedules_table_name)
         if save_error:
             return save_error
 
-        # Return success response
-        return create_success_response(schedule_data)
+        # Schedule content on IoT devices after successful DB save
+        iot_success, iot_errors, iot_responses = schedule_content_on_iot_devices(
+            schedule_data=schedule_data,
+            playlists_table_name=playlists_table_name,
+            contents_table_name=contents_table_name,
+            iot_api_url=iot_schedule_api_url,
+            default_s3_bucket=default_s3_bucket
+        )
+        
+        # Create enhanced response with IoT scheduling results
+        response_data = {
+            "schedule": schedule_data,
+            "iot_scheduling": {
+                "success": iot_success,
+                "errors": iot_errors,
+                "device_responses": iot_responses
+            }
+        }
+        
+        if iot_success:
+            return {
+                "statusCode": 201,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+                    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+                    "Access-Control-Max-Age": "86400",
+                },
+                "body": json.dumps({
+                    "message": "Schedule created and IoT devices scheduled successfully",
+                    "data": response_data
+                }),
+            }
+        else:
+            # Schedule was created but IoT scheduling failed
+            return {
+                "statusCode": 207,  # Multi-status: partial success
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Requested-With,Origin,Accept,Cache-Control,Pragma,If-Modified-Since,X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Port",
+                    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+                    "Access-Control-Max-Age": "86400",
+                },
+                "body": json.dumps({
+                    "message": "Schedule created successfully but IoT scheduling failed",
+                    "data": response_data,
+                    "warning": "Some or all IoT devices could not be scheduled"
+                }),
+            }
 
     except ValueError as e:
         return create_error_response(400, str(e))

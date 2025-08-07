@@ -286,8 +286,13 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/schedule",
             environment={
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "IOT_SCHEDULE_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/schedule",
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         get_schedule_lambda = create_lambda_function(
@@ -565,6 +570,8 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
 
         grant_table_permissions(create_schedule_lambda, schedules_table, "write")
+        grant_table_permissions(create_schedule_lambda, playlists_table, "read")
+        grant_table_permissions(create_schedule_lambda, contents_table, "read")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
