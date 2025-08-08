@@ -305,6 +305,7 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         update_schedule_lambda = create_lambda_function(
@@ -317,6 +318,7 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         get_schedules_by_org_lambda = create_lambda_function(
@@ -329,6 +331,7 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         # Create Playlist Lambda functions
