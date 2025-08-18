@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     parse_request_body,
     validate_content_fields,
@@ -10,6 +11,7 @@ from utils.helpers import (
     create_content_response,
     create_error_response,
 )
+from utils.rbac import check_edit_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -53,6 +55,19 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if not content_id:
             return create_error_response(400, "Content ID is required")
+
+        # First get the existing content to check its organization_id for RBAC
+        existing_content, get_error = get_content_by_id_from_db(content_id, table_name)
+        if get_error:
+            return get_error
+
+        # RBAC: Check if user has permission to edit content in this organization
+        rbac_error, user_info = check_edit_permission_with_org(event, "content", existing_content["organization_id"])
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) updating content {content_id}")
 
         # Parse request body
         body, parse_error = parse_request_body(event)

@@ -1,11 +1,13 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     get_all_organizations_from_db,
     create_organizations_list_response,
     create_error_response,
 )
+from utils.rbac import check_view_permission
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -26,6 +28,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
+
+        # RBAC: Check if user has permission to view organizations (SUPERADMIN only)
+        rbac_error, user_info = check_view_permission(event, "organization")
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) viewing all organizations")
 
         # Get organizations from database
         organizations, get_error = get_all_organizations_from_db(table_name)

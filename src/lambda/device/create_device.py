@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     parse_request_body,
     validate_required_fields,
@@ -9,6 +10,7 @@ from utils.helpers import (
     create_success_response,
     create_error_response,
 )
+from utils.rbac import check_create_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -42,10 +44,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
 
-        # Parse request body
+        # Parse request body first to get organization_id for RBAC check
         body, parse_error = parse_request_body(event)
         if parse_error:
             return parse_error
+
+        # Extract organization_id from request body for RBAC validation
+        organization_id = body.get("organization_id", "")
+        if not organization_id:
+            return create_error_response(400, "organization_id is required")
+
+        # RBAC: Check if user has permission to create devices in this organization
+        rbac_error, user_info = check_create_permission_with_org(event, "device", organization_id)
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) creating device in org {organization_id}")
 
         # Validate required fields
         validation_error = validate_required_fields(body)

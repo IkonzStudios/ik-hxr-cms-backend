@@ -1,11 +1,13 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     get_contents_by_org_id_from_db,
     create_contents_list_response,
     create_error_response,
 )
+from utils.rbac import check_view_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -35,6 +37,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if not org_id:
             return create_error_response(400, "Organization ID is required")
+
+        # RBAC: Check if user has permission to view content in this organization
+        rbac_error, user_info = check_view_permission_with_org(event, "content", org_id)
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) viewing contents in org {org_id}")
 
         # Get contents from database
         contents, get_error = get_contents_by_org_id_from_db(org_id, table_name)

@@ -1,11 +1,13 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     get_device_by_id_from_db,
     create_device_response,
     create_error_response,
 )
+from utils.rbac import check_view_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -37,18 +39,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Debug: Print the event structure
         print(f"Event object: {json.dumps(event)}")
 
-        # Extract user context from authorizer
-        request_context = event.get("requestContext", {})
-        authorizer = request_context.get("authorizer", {})
-
-        user_id = authorizer.get("user_id")
-        user_email = authorizer.get("email")
-        user_role = authorizer.get("role")
-        user_org_id = authorizer.get("organization_id")
-
-        print(
-            f"User Context - ID: {user_id}, Email: {user_email}, Role: {user_role}, Org: {user_org_id}"
-        )
+        # User context will be extracted by RBAC helper
 
         # Extract device ID from path parameters
         path_parameters = event.get("pathParameters", {})
@@ -57,10 +48,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not device_id:
             return create_error_response(400, "Device ID is required")
 
-        # Get device from database
+        # First get the device to check its organization_id
         device, get_error = get_device_by_id_from_db(device_id, table_name)
         if get_error:
             return get_error
+
+        # RBAC: Check if user has permission to view devices in this organization
+        rbac_error, user_info = check_view_permission_with_org(event, "device", device["organization_id"])
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) viewing device {device_id}")
 
         # Return success response
         return create_device_response(device)

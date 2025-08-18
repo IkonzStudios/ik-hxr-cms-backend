@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     parse_request_body,
     get_organization_by_id_from_db,
@@ -9,6 +10,7 @@ from utils.helpers import (
     create_organization_response,
     create_error_response,
 )
+from utils.rbac import check_edit_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -43,6 +45,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if not organization_id:
             return create_error_response(400, "Organization ID is required")
+
+        # RBAC: Check if user has permission to edit this organization
+        rbac_error, user_info = check_edit_permission_with_org(event, "organization", organization_id)
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) updating organization {organization_id}")
 
         # Parse request body
         body, parse_error = parse_request_body(event)

@@ -6,6 +6,7 @@ import uuid
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
+from utils.rbac import check_upload_permission_with_org
 
 
 def get_cors_headers() -> Dict[str, str]:
@@ -70,6 +71,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "headers": get_cors_headers(),
                 "body": json.dumps({"error": "organization_id not found in token"}),
             }
+
+        # RBAC: Check if user has permission to upload content in this organization
+        rbac_error, user_info = check_upload_permission_with_org(event, "content", organization_id)
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) uploading content to org {organization_id}")
 
         # Validate file name
         if not is_valid_filename(file_name):

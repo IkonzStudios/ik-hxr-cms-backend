@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, Any
+
 from utils.helpers import (
     parse_request_body,
     validate_required_fields,
@@ -9,6 +10,7 @@ from utils.helpers import (
     create_success_response,
     create_error_response,
 )
+from utils.rbac import check_create_permission
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -32,6 +34,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
+
+        # RBAC: Check if user has permission to create organizations (SUPERADMIN only)
+        rbac_error, user_info = check_create_permission(event, "organization")
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) creating organization")
 
         # Parse request body
         body, parse_error = parse_request_body(event)

@@ -1,11 +1,14 @@
 import json
 import os
+import sys
 from typing import Dict, Any
+
 from utils.helpers import (
     get_application_by_id_from_db,
     create_application_response,
     create_error_response,
 )
+from utils.rbac import check_view_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -36,10 +39,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not application_id:
             return create_error_response(400, "Application ID is required")
 
-        # Get application from database
+        # First get the application to check its organization_id
         application, error = get_application_by_id_from_db(application_id, table_name)
         if error:
             return error
+
+        # RBAC: Check if user has permission to view applications in this organization
+        rbac_error, user_info = check_view_permission_with_org(event, "application", application["organization_id"])
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) viewing application {application_id}")
 
         # Return success response
         return create_application_response(application)

@@ -6,6 +6,7 @@ from utils.helpers import (
     create_playlists_list_response,
     create_error_response,
 )
+from utils.rbac import check_view_permission_with_org
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -35,6 +36,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if not org_id:
             return create_error_response(400, "Organization ID is required")
+
+        # RBAC: Check if user has permission to view playlists in this organization
+        rbac_error, user_info = check_view_permission_with_org(event, "playlist", org_id)
+        if rbac_error:
+            return rbac_error
+
+        # Log user action for audit
+        print(f"User {user_info['user_id']} ({user_info['role']}) viewing playlists in org {org_id}")
 
         # Get playlists from database
         playlists, get_error = get_playlists_by_org_id_from_db(org_id, table_name)
