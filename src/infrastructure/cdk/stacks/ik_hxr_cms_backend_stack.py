@@ -277,6 +277,22 @@ class IkHxrCmsBackendStack(Stack):
         # Grant S3 permissions to upload content Lambda
         grant_s3_permissions(upload_content_lambda, content_bucket, "write")
 
+        # Create Get Content Presigned URL Lambda function
+        get_content_presigned_url_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetContentPresignedUrlFunction",
+            function_name=f"Cms-GetContentPresignedUrl-{env_name_capitalized}",
+            handler="get_content_presigned_url.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Grant S3 permissions to presigned URL Lambda
+        grant_s3_permissions(get_content_presigned_url_lambda, content_bucket, "read")
+
         # Create Schedule Lambda functions
         create_schedule_lambda = create_lambda_function(
             scope=self,
@@ -735,6 +751,9 @@ class IkHxrCmsBackendStack(Stack):
             get_contents_by_org_lambda
         )
         upload_content_integration = apigateway.LambdaIntegration(upload_content_lambda)
+        get_content_presigned_url_integration = apigateway.LambdaIntegration(
+            get_content_presigned_url_lambda
+        )
 
         # Content API methods
         content_resource.add_method(
@@ -754,6 +773,12 @@ class IkHxrCmsBackendStack(Stack):
         content_upload_resource = content_resource.add_resource("upload")
         content_upload_resource.add_method(
             "POST", upload_content_integration, authorizer=authorizer
+        )
+
+        # Content URL endpoint
+        content_url_resource = content_resource.add_resource("url")
+        content_url_resource.add_method(
+            "POST", get_content_presigned_url_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF CONTENT API -------------------------------------
 
