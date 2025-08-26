@@ -7,6 +7,7 @@ import os
 import requests
 import uuid
 import time
+import traceback
 from typing import Dict, Any, List, Tuple, Optional
 import boto3
 
@@ -132,6 +133,5 @@ def assign_content_to_device_utility(
     except Exception as e:
         error_msg = f"Error assigning content to device: {str(e)}"
         print(error_msg)
-        import traceback
         print(f"Traceback: {traceback.format_exc()}")
         return False, error_msg, None

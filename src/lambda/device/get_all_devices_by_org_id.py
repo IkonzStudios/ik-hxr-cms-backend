@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 from typing import Dict, Any
 
 from utils.helpers import (
@@ -59,7 +60,5 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error getting devices by organization ID: {str(e)}")
         print(f"Error type: {type(e)}")
-        import traceback
-
         print(f"Traceback: {traceback.format_exc()}")
         return create_error_response(500, "Internal server error")

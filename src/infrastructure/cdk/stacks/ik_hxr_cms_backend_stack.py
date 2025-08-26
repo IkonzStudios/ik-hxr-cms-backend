@@ -538,13 +538,99 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
-        # Create IoT Lambda functions
-        configure_device_volume_lambda = create_lambda_function(
+        # Create new specialized Device Lambda functions
+        assign_content_to_device_lambda = create_lambda_function(
             scope=self,
-            construct_id="ConfigureDeviceVolumeFunction",
-            function_name=f"Cms-ConfigureDeviceVolume-{env_name_capitalized}",
-            handler="configure_device_volume.handler",
-            code_path="src/lambda/iot",
+            construct_id="AssignContentToDeviceFunction",
+            function_name=f"Cms-AssignContentToDevice-{env_name_capitalized}",
+            handler="assign_content_to_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        assign_playlist_to_device_lambda = create_lambda_function(
+            scope=self,
+            construct_id="AssignPlaylistToDeviceFunction",
+            function_name=f"Cms-AssignPlaylistToDevice-{env_name_capitalized}",
+            handler="assign_playlist_to_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        assign_app_to_device_lambda = create_lambda_function(
+            scope=self,
+            construct_id="AssignAppToDeviceFunction",
+            function_name=f"Cms-AssignAppToDevice-{env_name_capitalized}",
+            handler="assign_app_to_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        remove_content_from_device_lambda = create_lambda_function(
+            scope=self,
+            construct_id="RemoveContentFromDeviceFunction",
+            function_name=f"Cms-RemoveContentFromDevice-{env_name_capitalized}",
+            handler="remove_content_from_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        remove_playlist_from_device_lambda = create_lambda_function(
+            scope=self,
+            construct_id="RemovePlaylistFromDeviceFunction",
+            function_name=f"Cms-RemovePlaylistFromDevice-{env_name_capitalized}",
+            handler="remove_playlist_from_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        remove_app_from_device_lambda = create_lambda_function(
+            scope=self,
+            construct_id="RemoveAppFromDeviceFunction",
+            function_name=f"Cms-RemoveAppFromDevice-{env_name_capitalized}",
+            handler="remove_app_from_device.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Create Device IoT Lambda functions (moved to device/iot directory)
+        configure_device_brightness_lambda = create_lambda_function(
+            scope=self,
+            construct_id="ConfigureDeviceBrightnessFunction",
+            function_name=f"Cms-ConfigureDeviceBrightness-{env_name_capitalized}",
+            handler="configure_device_brightness.handler",
+            code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
@@ -553,12 +639,12 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],
         )
 
-        configure_device_brightness_lambda = create_lambda_function(
+        configure_device_volume_lambda = create_lambda_function(
             scope=self,
-            construct_id="ConfigureDeviceBrightnessFunction",
-            function_name=f"Cms-ConfigureDeviceBrightness-{env_name_capitalized}",
-            handler="configure_device_brightness.handler",
-            code_path="src/lambda/iot",
+            construct_id="ConfigureDeviceVolumeFunction",
+            function_name=f"Cms-ConfigureDeviceVolume-{env_name_capitalized}",
+            handler="configure_device_volume.handler",
+            code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
@@ -572,10 +658,24 @@ class IkHxrCmsBackendStack(Stack):
             construct_id="ConfigureDeviceWifiFunction",
             function_name=f"Cms-ConfigureDeviceWifi-{env_name_capitalized}",
             handler="configure_device_wifi.handler",
-            code_path="src/lambda/iot",
+            code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        generic_command_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GenericCommandFunction",
+            function_name=f"Cms-GenericCommand-{env_name_capitalized}",
+            handler="generic_command.handler",
+            code_path="src/lambda/device/iot",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_COMMAND_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/command",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -627,10 +727,26 @@ class IkHxrCmsBackendStack(Stack):
             get_applications_by_org_lambda, applications_table, "read"
         )
 
-        # Grant table permissions to IoT Lambda functions
-        grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
+        # Grant table permissions to new specialized device Lambda functions
+        grant_table_permissions(assign_content_to_device_lambda, devices_table, "read_write")
+        grant_table_permissions(assign_content_to_device_lambda, contents_table, "read")
+        grant_table_permissions(assign_playlist_to_device_lambda, devices_table, "read_write")
+        grant_table_permissions(assign_playlist_to_device_lambda, playlists_table, "read")
+        grant_table_permissions(assign_playlist_to_device_lambda, contents_table, "read")
+        grant_table_permissions(assign_app_to_device_lambda, devices_table, "read_write")
+        grant_table_permissions(assign_app_to_device_lambda, applications_table, "read")
+        grant_table_permissions(remove_content_from_device_lambda, devices_table, "read_write")
+        grant_table_permissions(remove_content_from_device_lambda, contents_table, "read")
+        grant_table_permissions(remove_playlist_from_device_lambda, devices_table, "read_write")
+        grant_table_permissions(remove_playlist_from_device_lambda, playlists_table, "read")
+        grant_table_permissions(remove_app_from_device_lambda, devices_table, "read_write")
+        grant_table_permissions(remove_app_from_device_lambda, applications_table, "read")
+
+        # Grant table permissions to Device IoT Lambda functions
         grant_table_permissions(configure_device_brightness_lambda, devices_table, "read")
+        grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
         grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
+        grant_table_permissions(generic_command_lambda, devices_table, "read")
 
         # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
@@ -712,13 +828,13 @@ class IkHxrCmsBackendStack(Stack):
         )
 
         # ------------------------------------- DEVICE API -------------------------------------
-        # API resources
+        # Base device API resources
         device_resource = api.root.add_resource("device")
         device_id_resource = device_resource.add_resource("{id}")
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
 
-        # Lambda integrations
+        # Lambda integrations for basic device operations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
         get_device_integration = apigateway.LambdaIntegration(get_device_lambda)
         update_device_integration = apigateway.LambdaIntegration(update_device_lambda)
@@ -726,7 +842,7 @@ class IkHxrCmsBackendStack(Stack):
             get_devices_by_org_lambda
         )
 
-        # API methods
+        # Basic device API methods
         device_resource.add_method(
             "POST", create_device_integration, authorizer=authorizer
         )
@@ -739,6 +855,61 @@ class IkHxrCmsBackendStack(Stack):
         org_id_resource.add_method(
             "GET", get_devices_by_org_integration, authorizer=authorizer
         )
+
+        # Device Assignment API Resources and Methods
+        # Content assignment
+        assign_content_resource = device_id_resource.add_resource("assign-content")
+        assign_content_integration = apigateway.LambdaIntegration(assign_content_to_device_lambda)
+        assign_content_resource.add_method("POST", assign_content_integration, authorizer=authorizer)
+
+        # Playlist assignment
+        assign_playlist_resource = device_id_resource.add_resource("assign-playlist")
+        assign_playlist_integration = apigateway.LambdaIntegration(assign_playlist_to_device_lambda)
+        assign_playlist_resource.add_method("POST", assign_playlist_integration, authorizer=authorizer)
+
+        # Application assignment
+        assign_app_resource = device_id_resource.add_resource("assign-app")
+        assign_app_integration = apigateway.LambdaIntegration(assign_app_to_device_lambda)
+        assign_app_resource.add_method("POST", assign_app_integration, authorizer=authorizer)
+
+        # Device Removal API Resources and Methods
+        # Content removal
+        remove_content_resource = device_id_resource.add_resource("remove-content")
+        remove_content_integration = apigateway.LambdaIntegration(remove_content_from_device_lambda)
+        remove_content_resource.add_method("POST", remove_content_integration, authorizer=authorizer)
+
+        # Playlist removal
+        remove_playlist_resource = device_id_resource.add_resource("remove-playlist")
+        remove_playlist_integration = apigateway.LambdaIntegration(remove_playlist_from_device_lambda)
+        remove_playlist_resource.add_method("POST", remove_playlist_integration, authorizer=authorizer)
+
+        # Application removal
+        remove_app_resource = device_id_resource.add_resource("remove-app")
+        remove_app_integration = apigateway.LambdaIntegration(remove_app_from_device_lambda)
+        remove_app_resource.add_method("POST", remove_app_integration, authorizer=authorizer)
+
+        # Device IoT Configuration API Resources and Methods
+        config_resource = device_id_resource.add_resource("config")
+
+        # Brightness configuration
+        brightness_config_resource = config_resource.add_resource("brightness")
+        brightness_config_integration = apigateway.LambdaIntegration(configure_device_brightness_lambda)
+        brightness_config_resource.add_method("POST", brightness_config_integration, authorizer=authorizer)
+
+        # Volume configuration
+        volume_config_resource = config_resource.add_resource("volume")
+        volume_config_integration = apigateway.LambdaIntegration(configure_device_volume_lambda)
+        volume_config_resource.add_method("POST", volume_config_integration, authorizer=authorizer)
+
+        # WiFi configuration
+        wifi_config_resource = config_resource.add_resource("wifi")
+        wifi_config_integration = apigateway.LambdaIntegration(configure_device_wifi_lambda)
+        wifi_config_resource.add_method("POST", wifi_config_integration, authorizer=authorizer)
+
+        # Generic command
+        command_resource = device_id_resource.add_resource("command")
+        command_integration = apigateway.LambdaIntegration(generic_command_lambda)
+        command_resource.add_method("POST", command_integration, authorizer=authorizer)
         # ------------------------------------- END OF DEVICE API -------------------------------------
 
         # ------------------------------------- CONTENT API -------------------------------------
@@ -982,23 +1153,4 @@ class IkHxrCmsBackendStack(Stack):
             "POST", create_user_integration, authorizer=authorizer
         )
 
-        # ------------------------------------- IOT API -------------------------------------
-        # API resources
-        iot_resource = api.root.add_resource("iot")
-        device_config_resource = iot_resource.add_resource("device")
-        
-        # Volume configuration
-        volume_resource = device_config_resource.add_resource("volume")
-        volume_integration = apigateway.LambdaIntegration(configure_device_volume_lambda)
-        volume_resource.add_method("POST", volume_integration, authorizer=authorizer)
-        
-        # Brightness configuration
-        brightness_resource = device_config_resource.add_resource("brightness")
-        brightness_integration = apigateway.LambdaIntegration(configure_device_brightness_lambda)
-        brightness_resource.add_method("POST", brightness_integration, authorizer=authorizer)
-        
-        # WiFi configuration
-        wifi_resource = device_config_resource.add_resource("wifi")
-        wifi_integration = apigateway.LambdaIntegration(configure_device_wifi_lambda)
-        wifi_resource.add_method("POST", wifi_integration, authorizer=authorizer)
-        # ------------------------------------- END OF IOT API -------------------------------------
+
