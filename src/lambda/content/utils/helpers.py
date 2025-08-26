@@ -88,14 +88,14 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Parse stringified array fields (assigned_to, playlists) from the body.
+    Parse stringified array fields (assigned_to) from the body.
 
     Returns:
         Dictionary with parsed array values
     """
     result = {}
 
-    for field_name in ["assigned_to", "playlists"]:
+    for field_name in ["assigned_to"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -134,10 +134,8 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "size": body.get("size", "0"),
         "duration": body.get("duration", "0"),
         "type": body.get("type", "other"),
-        "is_active": body.get("is_active", True),
         "is_deleted": body.get("is_deleted", False),
         "assigned_to": arrays["assigned_to"],
-        "playlists": arrays["playlists"],
         "organization_id": body["organization_id"],
         "status": body.get("status", DEFAULT_CONTENT_STATUS),
         "created_at": current_time,
@@ -366,12 +364,9 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "size",
         "duration",
         "type",
-        "is_active",
         "is_deleted",
         "assigned_to",
-        "playlists",
         "updated_by",
-        "is_deleted",
         "status",
     ]
 
@@ -379,7 +374,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
     for field in allowed_fields:
         if field in body:
-            if field in ["assigned_to", "playlists"]:
+            if field in ["assigned_to"]:
                 # Handle array fields
                 arrays = parse_array_fields({field: body[field]})
                 update_data[field] = arrays[field]
