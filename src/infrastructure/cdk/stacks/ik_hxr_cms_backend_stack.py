@@ -184,6 +184,9 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
         )
@@ -684,6 +687,9 @@ class IkHxrCmsBackendStack(Stack):
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
+        grant_table_permissions(get_device_lambda, contents_table, "read")
+        grant_table_permissions(get_device_lambda, playlists_table, "read")
+        grant_table_permissions(get_device_lambda, applications_table, "read")
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")

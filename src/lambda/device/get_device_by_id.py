@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from utils.helpers import (
     get_device_by_id_from_db,
-    create_device_response,
+    create_enriched_device_response,
     create_error_response,
 )
 from utils.rbac import check_view_permission_with_org
@@ -62,8 +62,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Log user action for audit
         print(f"User {user_info['user_id']} ({user_info['role']}) viewing device {device_id}")
 
-        # Return success response
-        return create_device_response(device)
+        # Return enriched success response
+        return create_enriched_device_response(device)
 
     except ValueError as e:
         return create_error_response(400, str(e))
