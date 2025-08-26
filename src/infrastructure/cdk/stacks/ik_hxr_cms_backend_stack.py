@@ -196,8 +196,12 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         get_devices_by_org_lambda = create_lambda_function(
@@ -581,6 +585,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
+        grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
 
         grant_table_permissions(create_content_lambda, contents_table, "write")

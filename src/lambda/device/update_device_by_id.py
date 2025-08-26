@@ -92,8 +92,54 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if get_error:
             return get_error
 
-        # Return success response
-        return create_device_response(updated_device)
+        # Check if contents were updated and trigger IoT content assignment
+        iot_assignment_result = None
+        if "contents" in update_data and update_data["contents"]:
+            try:
+                # Import IoT utility function
+                from iot.assign_content import assign_content_to_device_utility
+                
+                # Get required environment variables
+                contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+                content_bucket_name = os.environ.get("CONTENT_BUCKET_NAME")
+                
+                if contents_table_name and content_bucket_name:
+                    print(f"Triggering IoT content assignment for device {device_id}")
+                    
+                    # Parse contents JSON string to get content IDs
+                    content_ids = json.loads(update_data["contents"]) if isinstance(update_data["contents"], str) else update_data["contents"]
+                    
+                    success, error_msg, iot_response = assign_content_to_device_utility(
+                        device_id=device_id,
+                        content_ids=content_ids,
+                        contents_table_name=contents_table_name,
+                        content_bucket_name=content_bucket_name,
+                        devices_table_name=table_name
+                    )
+                    
+                    iot_assignment_result = {
+                        "success": success,
+                        "error": error_msg,
+                        "response": iot_response
+                    }
+                    
+                    if success:
+                        print(f"IoT content assignment successful for device {device_id}")
+                    else:
+                        print(f"IoT content assignment failed for device {device_id}: {error_msg}")
+                else:
+                    print("IoT content assignment skipped: missing CONTENTS_TABLE_NAME or CONTENT_BUCKET_NAME")
+                    
+            except Exception as e:
+                print(f"Error during IoT content assignment: {str(e)}")
+                iot_assignment_result = {
+                    "success": False,
+                    "error": f"IoT integration error: {str(e)}",
+                    "response": None
+                }
+
+        # Return success response using the enhanced create_device_response function
+        return create_device_response(updated_device, iot_assignment_result)
 
     except ValueError as e:
         return create_error_response(400, str(e))

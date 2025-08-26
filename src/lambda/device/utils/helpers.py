@@ -439,17 +439,41 @@ def create_devices_list_response(devices: list) -> Dict[str, Any]:
     }
 
 
-def create_device_response(device: Dict[str, Any]) -> Dict[str, Any]:
+def create_device_response(device: Dict[str, Any], iot_assignment_result: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Create a successful response for single device.
 
+    Args:
+        device: Device data dictionary
+        iot_assignment_result: Optional IoT assignment result for device updates
+
     Returns:
-        Success response dictionary with device data
+        Success response dictionary with device data and optional IoT results
     """
     formatted_device = format_response_device(device)
+    
+    # Prepare response body
+    response_body = {"device": formatted_device}
+    
+    # Add IoT assignment result if provided
+    if iot_assignment_result:
+        response_body["iot_content_assignment"] = iot_assignment_result
+    
+    # Determine status code and message based on IoT result
+    if iot_assignment_result and not iot_assignment_result.get("success", True):
+        # Device update succeeded but IoT assignment failed
+        status_code = 207  # Multi-status: partial success
+        response_body["message"] = "Device updated successfully but IoT content assignment failed"
+        response_body["warning"] = "Content assignment to IoT device failed"
+    else:
+        # Normal success response
+        status_code = 200
+        if iot_assignment_result and iot_assignment_result.get("success"):
+            response_body["message"] = "Device updated successfully with IoT content assignment"
+        # Note: No message for regular device operations to maintain backward compatibility
 
     return {
-        "statusCode": 200,
+        "statusCode": status_code,
         "headers": get_cors_headers(),
-        "body": json.dumps({"device": formatted_device}),
+        "body": json.dumps(response_body),
     }
