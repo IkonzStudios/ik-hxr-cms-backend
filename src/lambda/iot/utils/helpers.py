@@ -150,4 +150,91 @@ def create_error_response(status_code: int, error_message: str) -> Dict[str, Any
         "statusCode": status_code,
         "headers": get_cors_headers(),
         "body": json.dumps({"error": error_message}),
-    } 
+    }
+
+
+def validate_iso_datetime(date_string: str) -> bool:
+    """
+    Validate if the date string is in ISO 8601 format.
+    
+    Args:
+        date_string: The date string to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+        return True
+    except ValueError:
+        return False
+
+
+def validate_content_list(contents: List[Dict[str, Any]], s3_bucket_required: bool = True) -> Optional[str]:
+    """
+    Validate a list of content items.
+    
+    Args:
+        contents: List of content dictionaries to validate
+        s3_bucket_required: Whether s3_bucket field is required
+        
+    Returns:
+        None if valid, error message string if invalid
+    """
+    if not isinstance(contents, list) or len(contents) == 0:
+        return "contents must be a non-empty array"
+    
+    for i, content in enumerate(contents):
+        if not isinstance(content, dict):
+            return f"contents[{i}] must be an object"
+        
+        if s3_bucket_required:
+            if "s3_bucket" not in content:
+                return f"contents[{i}].s3_bucket is required"
+            
+            if not isinstance(content["s3_bucket"], str) or not content["s3_bucket"].strip():
+                return f"contents[{i}].s3_bucket must be a non-empty string"
+        
+        if "s3_key" not in content:
+            return f"contents[{i}].s3_key is required"
+        
+        if not isinstance(content["s3_key"], str) or not content["s3_key"].strip():
+            return f"contents[{i}].s3_key must be a non-empty string"
+    
+    return None
+
+
+def call_iot_api(url: str, payload: Dict[str, Any], timeout: int = 30) -> Tuple[int, Dict[str, Any]]:
+    """
+    Make a call to the IoT API.
+    
+    Args:
+        url: The IoT API endpoint URL
+        payload: The payload to send
+        timeout: Request timeout in seconds
+        
+    Returns:
+        Tuple of (status_code, response_data)
+    """
+    import requests
+    
+    try:
+        print(f"Calling IoT API: {url}")
+        print(f"Payload: {json.dumps(payload)}")
+        
+        response = requests.post(
+            url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=timeout
+        )
+        
+        print(f"IoT API Response Status: {response.status_code}")
+        print(f"IoT API Response: {response.text}")
+        
+        response_data = response.json() if response.text else {}
+        return response.status_code, response_data
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling IoT API: {str(e)}")
+        raise e

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any, Tuple, Optional
-from .constants import REQUIRED_CONTENT_FIELDS, CONTENT_FIELD_TYPES, VALID_CONTENT_TYPES
+from .constants import REQUIRED_CONTENT_FIELDS, CONTENT_FIELD_TYPES, VALID_CONTENT_TYPES, VALID_CONTENT_STATUS, DEFAULT_CONTENT_STATUS
 
 
 def get_cors_headers() -> Dict[str, str]:
@@ -88,14 +88,14 @@ def validate_required_fields(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Parse stringified array fields (assigned_to, playlists) from the body.
+    Parse stringified array fields (assigned_to) from the body.
 
     Returns:
         Dictionary with parsed array values
     """
     result = {}
 
-    for field_name in ["assigned_to", "playlists"]:
+    for field_name in ["assigned_to"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -134,11 +134,10 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "size": body.get("size", "0"),
         "duration": body.get("duration", "0"),
         "type": body.get("type", "other"),
-        "is_active": body.get("is_active", True),
         "is_deleted": body.get("is_deleted", False),
         "assigned_to": arrays["assigned_to"],
-        "playlists": arrays["playlists"],
         "organization_id": body["organization_id"],
+        "status": body.get("status", DEFAULT_CONTENT_STATUS),
         "created_at": current_time,
         "updated_at": current_time,
         "created_by": body.get("created_by", ""),
@@ -148,6 +147,10 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
     # Validate content type
     if content_data["type"] not in VALID_CONTENT_TYPES:
         content_data["type"] = "other"
+
+    # Validate content status
+    if content_data["status"] not in VALID_CONTENT_STATUS:
+        content_data["status"] = DEFAULT_CONTENT_STATUS
 
     return content_data
 
@@ -361,19 +364,17 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "size",
         "duration",
         "type",
-        "is_active",
         "is_deleted",
         "assigned_to",
-        "playlists",
         "updated_by",
-        "is_deleted",
+        "status",
     ]
 
     update_data = {}
 
     for field in allowed_fields:
         if field in body:
-            if field in ["assigned_to", "playlists"]:
+            if field in ["assigned_to"]:
                 # Handle array fields
                 arrays = parse_array_fields({field: body[field]})
                 update_data[field] = arrays[field]
@@ -383,6 +384,12 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
                     update_data[field] = body[field]
                 else:
                     update_data[field] = "other"
+            elif field == "status":
+                # Validate content status
+                if body[field] in VALID_CONTENT_STATUS:
+                    update_data[field] = body[field]
+                else:
+                    update_data[field] = DEFAULT_CONTENT_STATUS
             else:
                 update_data[field] = body[field]
 
@@ -478,5 +485,9 @@ def validate_content_fields(body: Dict[str, Any]) -> Optional[str]:
     # Validate content type
     if "type" in body and body["type"] not in VALID_CONTENT_TYPES:
         return f"Content type must be one of: {', '.join(VALID_CONTENT_TYPES)}"
+
+    # Validate content status
+    if "status" in body and body["status"] not in VALID_CONTENT_STATUS:
+        return f"Content status must be one of: {', '.join(VALID_CONTENT_STATUS)}"
 
     return None

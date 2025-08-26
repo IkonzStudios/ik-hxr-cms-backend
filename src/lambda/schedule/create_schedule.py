@@ -10,8 +10,8 @@ from utils.helpers import (
     save_schedule_to_db,
     create_success_response,
     create_error_response,
-    schedule_content_on_iot_devices,
 )
+from iot.schedule_content import schedule_content_on_iot_devices
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

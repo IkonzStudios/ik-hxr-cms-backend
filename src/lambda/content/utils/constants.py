@@ -21,12 +21,11 @@ OPTIONAL_CONTENT_FIELDS = [
     "size",
     "duration",
     "type",
-    "is_active",
     "is_deleted",
     "assigned_to",
-    "playlists",
     "created_by",
     "updated_by",
+    "status",
 ]
 
 # Content field types for validation
@@ -36,9 +35,20 @@ CONTENT_FIELD_TYPES = {
     "type": str,  # File type/category (video, image, document, etc.)
     "url": str,  # S3 file URL without prefix
     "is_deleted": bool,  # Soft delete flag
+    "status": str,  # Content approval status
 }
 
 # Valid content types
 VALID_CONTENT_TYPES = [
     "video/mp4",
 ]
+
+# Valid content status values
+VALID_CONTENT_STATUS = [
+    "PENDING",
+    "REJECTED", 
+    "APPROVED",
+]
+
+# Default content status
+DEFAULT_CONTENT_STATUS = "PENDING"

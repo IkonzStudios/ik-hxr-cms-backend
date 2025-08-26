@@ -28,10 +28,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "size": "1048576",
         "duration": "120.5",
         "type": "video/mp4",
-        "is_active": true,
+        "status": "PENDING",  // Optional: PENDING, REJECTED, APPROVED (defaults to PENDING)
         "is_deleted": false,
         "assigned_to": "[\"device-id-1\", \"device-id-2\"]",
-        "playlists": "[\"playlist-id-1\", \"playlist-id-2\"]",
         "organization_id": "123e4567-e89b-12d3-a456-426614174000",
         "created_by": "user-id-123",
         "updated_by": "user-id-123"
