@@ -627,6 +627,20 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Content Status Update Lambda function
+        update_content_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateContentStatusFunction",
+            function_name=f"Cms-UpdateContentStatus-{env_name_capitalized}",
+            handler="update_content_status.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create Device IoT Lambda functions (moved to device/iot directory)
         configure_device_brightness_lambda = create_lambda_function(
             scope=self,
@@ -747,6 +761,10 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(remove_playlist_from_device_lambda, playlists_table, "read")
         grant_table_permissions(remove_app_from_device_lambda, devices_table, "read_write")
         grant_table_permissions(remove_app_from_device_lambda, applications_table, "read")
+
+        # Grant table permissions to Content Status Update Lambda function
+        grant_table_permissions(update_content_status_lambda, devices_table, "read_write")
+        grant_table_permissions(update_content_status_lambda, contents_table, "read")
 
         # Grant table permissions to Device IoT Lambda functions
         grant_table_permissions(configure_device_brightness_lambda, devices_table, "read")
@@ -893,6 +911,11 @@ class IkHxrCmsBackendStack(Stack):
         remove_app_resource = device_id_resource.add_resource("remove-app")
         remove_app_integration = apigateway.LambdaIntegration(remove_app_from_device_lambda)
         remove_app_resource.add_method("POST", remove_app_integration, authorizer=authorizer)
+
+        # Content Status Update API Resource and Method
+        content_status_resource = device_id_resource.add_resource("content-status")
+        content_status_integration = apigateway.LambdaIntegration(update_content_status_lambda)
+        content_status_resource.add_method("POST", content_status_integration, authorizer=authorizer)
 
         # Device IoT Configuration API Resources and Methods
         config_resource = device_id_resource.add_resource("config")

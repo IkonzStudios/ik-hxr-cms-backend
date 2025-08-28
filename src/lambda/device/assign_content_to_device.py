@@ -81,9 +81,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return create_error_response(400, DEVICE_ERROR_MESSAGES["INVALID_CONTENT_IDS"])
 
         # Store original device state for rollback
-        original_contents = existing_device.get("contents", [])
-        if isinstance(original_contents, str):
-            original_contents = json.loads(original_contents) if original_contents else []
+        original_contents_initiated = existing_device.get("contents_initiated", [])
+        if isinstance(original_contents_initiated, str):
+            original_contents_initiated = json.loads(original_contents_initiated) if original_contents_initiated else []
 
         # Trigger IoT content assignment
         iot_assignment_result = None
@@ -116,14 +116,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 if success:
                     print(f"IoT content assignment successful for device {device_id}")
                     
-                    # Update device's content list in database
-                    current_contents = existing_device.get("contents", [])
-                    if isinstance(current_contents, str):
-                        current_contents = json.loads(current_contents) if current_contents else []
+                    # Update device's content lists in database
+                    current_contents_initiated = existing_device.get("contents_initiated", [])
+                    if isinstance(current_contents_initiated, str):
+                        current_contents_initiated = json.loads(current_contents_initiated) if current_contents_initiated else []
                     
                     # Add new content IDs to existing ones (avoid duplicates)
-                    updated_contents = list(set(current_contents + content_ids))
-                    update_data = {"contents": updated_contents}
+                    # updated_contents_initiated = list(set(current_contents_initiated + content_ids))
+                    updated_contents_initiated = current_contents_initiated.copy()
+
+                    for content_id in content_ids:
+                        if content_id not in updated_contents_initiated:
+                            updated_contents_initiated.append(content_id)
+
+                    update_data = {
+                        "contents_initiated": updated_contents_initiated
+                    }
                     
                     update_error = update_device_in_db(device_id, update_data, table_name)
                     if update_error:
@@ -153,7 +161,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if database_updated:
                 try:
                     print("Rolling back database changes due to error")
-                    rollback_data = {"contents": original_contents}
+                    rollback_data = {
+                        "contents_initiated": original_contents_initiated
+                    }
                     update_device_in_db(device_id, rollback_data, table_name)
                     print("Database rollback successful")
                 except Exception as rollback_error:

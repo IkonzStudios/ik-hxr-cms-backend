@@ -96,7 +96,7 @@ def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
     result = {}
 
-    for field_name in ["playlists", "applications", "contents"]:
+    for field_name in ["playlists", "applications", "contents_initiated"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -163,7 +163,9 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "ip_address": body.get("ip_address"),
         "playlists": arrays["playlists"],
         "applications": arrays["applications"],
-        "contents": arrays["contents"],
+        "contents_initiated": [],
+        "contents_downloading": [],
+        "contents_downloaded": [],
         "status": body.get("status", "active"),
         "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,
@@ -538,16 +540,18 @@ def enrich_device_with_related_data(device: Dict[str, Any]) -> Dict[str, Any]:
         playlists_table_name = os.environ.get("PLAYLISTS_TABLE_NAME")
         applications_table_name = os.environ.get("APPLICATIONS_TABLE_NAME")
         
-        # Parse and enrich contents
-        content_ids = device.get("contents", [])
-        if isinstance(content_ids, str):
-            content_ids = json.loads(content_ids) if content_ids else []
-        
-        if content_ids and contents_table_name:
-            contents = get_items_by_ids(contents_table_name, content_ids)
-            enriched_device["contents"] = [format_response_item(content) for content in contents]
-        else:
-            enriched_device["contents"] = []
+        # Parse and enrich content status arrays
+        content_status_fields = ["contents_initiated", "contents_downloading", "contents_downloaded"]
+        for field in content_status_fields:
+            content_ids = device.get(field, [])
+            if isinstance(content_ids, str):
+                content_ids = json.loads(content_ids) if content_ids else []
+            
+            if content_ids and contents_table_name:
+                contents = get_items_by_ids(contents_table_name, content_ids)
+                enriched_device[field] = [format_response_item(content) for content in contents]
+            else:
+                enriched_device[field] = []
         
         # Parse and enrich playlists
         playlist_ids = device.get("playlists", [])
@@ -574,7 +578,9 @@ def enrich_device_with_related_data(device: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error enriching device data: {str(e)}")
         # Return device with empty arrays if enrichment fails
-        enriched_device["contents"] = []
+        enriched_device["contents_initiated"] = []
+        enriched_device["contents_downloading"] = []
+        enriched_device["contents_downloaded"] = []
         enriched_device["playlists"] = []
         enriched_device["applications"] = []
     
@@ -596,7 +602,7 @@ def format_response_item(item: Dict[str, Any]) -> Dict[str, Any]:
     for key, value in item.items():
         if isinstance(value, Decimal):
             formatted_item[key] = float(value)
-        elif isinstance(value, str) and key in ["contents", "playlists", "applications"]:
+        elif isinstance(value, str) and key in ["contents_initiated", "contents_downloading", "contents_downloaded", "playlists", "applications"]:
             # Parse JSON strings for nested arrays
             try:
                 formatted_item[key] = json.loads(value) if value else []

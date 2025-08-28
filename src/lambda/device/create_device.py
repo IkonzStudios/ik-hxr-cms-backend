@@ -29,7 +29,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "ip_address": "192.168.1.100",
         "playlists": "[\"playlist1\", \"playlist2\"]",
         "applications": "[\"app1\", \"app2\"]",
-        "contents": "[\"content1\", \"content2\"]",
+        "contents_initiated": "[]",
+        "contents_downloading": "[]",
+        "contents_downloaded": "[]",
         "status": "active",
         "storage_left": 100.5,
         "storage_consumed": 50.2
