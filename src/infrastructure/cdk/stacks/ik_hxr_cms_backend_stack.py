@@ -300,6 +300,19 @@ class IkHxrCmsBackendStack(Stack):
         # Grant S3 permissions to presigned URL Lambda
         grant_s3_permissions(get_content_presigned_url_lambda, content_bucket, "read")
 
+        # Create Update Content Approval Status Lambda function
+        update_content_approval_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateContentApprovalStatusFunction",
+            function_name=f"Cms-UpdateContentApprovalStatus-{env_name_capitalized}",
+            handler="update_content_status.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create Schedule Lambda functions
         create_schedule_lambda = create_lambda_function(
             scope=self,
@@ -712,6 +725,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_content_lambda, contents_table, "read")
         grant_table_permissions(update_content_lambda, contents_table, "read_write")
         grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
+        grant_table_permissions(update_content_approval_status_lambda, contents_table, "read_write")
 
         grant_table_permissions(create_schedule_lambda, schedules_table, "write")
         grant_table_permissions(create_schedule_lambda, playlists_table, "read")
@@ -984,6 +998,13 @@ class IkHxrCmsBackendStack(Stack):
         content_url_resource = content_resource.add_resource("url")
         content_url_resource.add_method(
             "POST", get_content_presigned_url_integration, authorizer=authorizer
+        )
+
+        # Content Status Update endpoint
+        content_status_integration = apigateway.LambdaIntegration(update_content_approval_status_lambda)
+        content_status_resource = content_id_resource.add_resource("status")
+        content_status_resource.add_method(
+            "PATCH", content_status_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF CONTENT API -------------------------------------
 
