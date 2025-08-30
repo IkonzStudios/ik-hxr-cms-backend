@@ -17,10 +17,10 @@ PERMISSIONS = {
         # No device permissions
     },
     "standard_user": {
-        # No device permissions
+        "device": ["view"]
     },
     "viewer": {
-        # No device permissions
+        "device": ["view"]
     }
 }
 

@@ -139,6 +139,20 @@ class IkHxrCmsBackendStack(Stack):
             layers=[auth_dependencies_layer, common_dependencies_layer],
         )
 
+        refresh_token_lambda = create_lambda_function(
+            scope=self,
+            construct_id="RefreshTokenFunction",
+            function_name=f"Cms-RefreshToken-{env_name_capitalized}",
+            handler="refresh_token.handler",
+            code_path="src/lambda/auth",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "ENV": env_name,
+            },
+            layers=[auth_dependencies_layer, common_dependencies_layer],
+        )
+
         # Grant Cognito permissions to auth Lambda functions
         login_lambda.add_to_role_policy(
             iam.PolicyStatement(
@@ -158,6 +172,16 @@ class IkHxrCmsBackendStack(Stack):
                 actions=[
                     "cognito-idp:AdminRespondToAuthChallenge",
                     "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        refresh_token_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:InitiateAuth",
                 ],
                 resources=[user_pool.user_pool_arn],
             )
@@ -184,6 +208,9 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
         )
@@ -296,6 +323,19 @@ class IkHxrCmsBackendStack(Stack):
 
         # Grant S3 permissions to presigned URL Lambda
         grant_s3_permissions(get_content_presigned_url_lambda, content_bucket, "read")
+
+        # Create Update Content Approval Status Lambda function
+        update_content_approval_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateContentApprovalStatusFunction",
+            function_name=f"Cms-UpdateContentApprovalStatus-{env_name_capitalized}",
+            handler="update_content_status.handler",
+            code_path="src/lambda/content",
+            environment={
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
 
         # Create Schedule Lambda functions
         create_schedule_lambda = create_lambda_function(
@@ -624,6 +664,20 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Create Content Status Update Lambda function
+        update_content_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateContentStatusFunction",
+            function_name=f"Cms-UpdateContentStatus-{env_name_capitalized}",
+            handler="update_content_status.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create Device IoT Lambda functions (moved to device/iot directory)
         configure_device_brightness_lambda = create_lambda_function(
             scope=self,
@@ -684,6 +738,9 @@ class IkHxrCmsBackendStack(Stack):
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
+        grant_table_permissions(get_device_lambda, contents_table, "read")
+        grant_table_permissions(get_device_lambda, playlists_table, "read")
+        grant_table_permissions(get_device_lambda, applications_table, "read")
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
@@ -692,6 +749,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_content_lambda, contents_table, "read")
         grant_table_permissions(update_content_lambda, contents_table, "read_write")
         grant_table_permissions(get_contents_by_org_lambda, contents_table, "read")
+        grant_table_permissions(update_content_approval_status_lambda, contents_table, "read_write")
 
         grant_table_permissions(create_schedule_lambda, schedules_table, "write")
         grant_table_permissions(create_schedule_lambda, playlists_table, "read")
@@ -741,6 +799,10 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(remove_playlist_from_device_lambda, playlists_table, "read")
         grant_table_permissions(remove_app_from_device_lambda, devices_table, "read_write")
         grant_table_permissions(remove_app_from_device_lambda, applications_table, "read")
+
+        # Grant table permissions to Content Status Update Lambda function
+        grant_table_permissions(update_content_status_lambda, devices_table, "read_write")
+        grant_table_permissions(update_content_status_lambda, contents_table, "read")
 
         # Grant table permissions to Device IoT Lambda functions
         grant_table_permissions(configure_device_brightness_lambda, devices_table, "read")
@@ -888,6 +950,11 @@ class IkHxrCmsBackendStack(Stack):
         remove_app_integration = apigateway.LambdaIntegration(remove_app_from_device_lambda)
         remove_app_resource.add_method("POST", remove_app_integration, authorizer=authorizer)
 
+        # Content Status Update API Resource and Method
+        content_status_resource = device_id_resource.add_resource("content-status")
+        content_status_integration = apigateway.LambdaIntegration(update_content_status_lambda)
+        content_status_resource.add_method("POST", content_status_integration, authorizer=authorizer)
+
         # Device IoT Configuration API Resources and Methods
         config_resource = device_id_resource.add_resource("config")
 
@@ -955,6 +1022,13 @@ class IkHxrCmsBackendStack(Stack):
         content_url_resource = content_resource.add_resource("url")
         content_url_resource.add_method(
             "POST", get_content_presigned_url_integration, authorizer=authorizer
+        )
+
+        # Content Status Update endpoint
+        content_status_integration = apigateway.LambdaIntegration(update_content_approval_status_lambda)
+        content_status_resource = content_id_resource.add_resource("status")
+        content_status_resource.add_method(
+            "PATCH", content_status_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF CONTENT API -------------------------------------
 
@@ -1132,14 +1206,17 @@ class IkHxrCmsBackendStack(Stack):
         auth_resource = api.root.add_resource("auth")
         login_resource = auth_resource.add_resource("login")
         change_password_resource = auth_resource.add_resource("change-password")
+        refresh_token_resource = auth_resource.add_resource("refresh")
 
         login_integration = apigateway.LambdaIntegration(login_lambda)
         change_password_integration = apigateway.LambdaIntegration(
             change_password_lambda
         )
+        refresh_token_integration = apigateway.LambdaIntegration(refresh_token_lambda)
 
         login_resource.add_method("POST", login_integration)
         change_password_resource.add_method("POST", change_password_integration)
+        refresh_token_resource.add_method("POST", refresh_token_integration)
 
         # Add new Cognito endpoints
         cognito_resource = api.root.add_resource("cognito")

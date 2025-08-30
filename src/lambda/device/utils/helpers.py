@@ -1,4 +1,5 @@
 import json
+import os
 import boto3
 import uuid
 from datetime import datetime
@@ -95,7 +96,7 @@ def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
     result = {}
 
-    for field_name in ["playlists", "applications", "contents"]:
+    for field_name in ["playlists", "applications", "contents_initiated"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -162,7 +163,9 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "ip_address": body.get("ip_address"),
         "playlists": arrays["playlists"],
         "applications": arrays["applications"],
-        "contents": arrays["contents"],
+        "contents_initiated": [],
+        "contents_downloading": [],
+        "contents_downloaded": [],
         "status": body.get("status", "active"),
         "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,
@@ -476,4 +479,206 @@ def create_device_response(device: Dict[str, Any], iot_assignment_result: Dict[s
         "statusCode": status_code,
         "headers": get_cors_headers(),
         "body": json.dumps(response_body),
+    }
+
+
+def get_items_by_ids(table_name: str, item_ids: list) -> list:
+    """
+    Get multiple items by their IDs from a DynamoDB table.
+    
+    Args:
+        table_name: Name of the DynamoDB table
+        item_ids: List of item IDs to fetch
+        
+    Returns:
+        List of items found (may be fewer than requested if some IDs don't exist)
+    """
+    if not item_ids:
+        return []
+    
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        
+        items = []
+        # DynamoDB batch_get_item has a limit of 100 items
+        for i in range(0, len(item_ids), 100):
+            batch_ids = item_ids[i:i+100]
+            
+            response = dynamodb.batch_get_item(
+                RequestItems={
+                    table_name: {
+                        'Keys': [{'id': item_id} for item_id in batch_ids]
+                    }
+                }
+            )
+            
+            if table_name in response.get('Responses', {}):
+                items.extend(response['Responses'][table_name])
+        
+        return items
+    except Exception as e:
+        print(f"Error getting items from {table_name}: {str(e)}")
+        return []
+
+
+def enrich_device_with_related_data(device: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enrich a device object with full data for contents, playlists, and applications.
+    
+    Args:
+        device: Device object with ID references
+        
+    Returns:
+        Device object with full related data
+    """
+    enriched_device = device.copy()
+    
+    try:
+        # Get table names from environment
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        playlists_table_name = os.environ.get("PLAYLISTS_TABLE_NAME")
+        applications_table_name = os.environ.get("APPLICATIONS_TABLE_NAME")
+        
+        # Parse and enrich content status arrays
+        content_status_fields = ["contents_initiated", "contents_downloading", "contents_downloaded"]
+        for field in content_status_fields:
+            content_ids = device.get(field, [])
+            if isinstance(content_ids, str):
+                content_ids = json.loads(content_ids) if content_ids else []
+            
+            if content_ids and contents_table_name:
+                contents = get_items_by_ids(contents_table_name, content_ids)
+                enriched_device[field] = [format_response_item(content) for content in contents]
+            else:
+                enriched_device[field] = []
+        
+        # Parse and enrich playlists
+        playlist_ids = device.get("playlists", [])
+        if isinstance(playlist_ids, str):
+            playlist_ids = json.loads(playlist_ids) if playlist_ids else []
+        
+        if playlist_ids and playlists_table_name:
+            playlists = get_items_by_ids(playlists_table_name, playlist_ids)
+            enriched_device["playlists"] = [format_response_item(playlist) for playlist in playlists]
+        else:
+            enriched_device["playlists"] = []
+        
+        # Parse and enrich applications
+        application_ids = device.get("applications", [])
+        if isinstance(application_ids, str):
+            application_ids = json.loads(application_ids) if application_ids else []
+        
+        if application_ids and applications_table_name:
+            applications = get_items_by_ids(applications_table_name, application_ids)
+            enriched_device["applications"] = [format_response_item(app) for app in applications]
+        else:
+            enriched_device["applications"] = []
+            
+    except Exception as e:
+        print(f"Error enriching device data: {str(e)}")
+        # Return device with empty arrays if enrichment fails
+        enriched_device["contents_initiated"] = []
+        enriched_device["contents_downloading"] = []
+        enriched_device["contents_downloaded"] = []
+        enriched_device["playlists"] = []
+        enriched_device["applications"] = []
+    
+    return enriched_device
+
+
+def format_response_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Format an item for JSON response by converting Decimal to float and handling special types.
+    
+    Args:
+        item: Item data from DynamoDB
+        
+    Returns:
+        Item data formatted for JSON response
+    """
+    formatted_item = {}
+    
+    for key, value in item.items():
+        if isinstance(value, Decimal):
+            formatted_item[key] = float(value)
+        elif isinstance(value, str) and key in ["contents_initiated", "contents_downloading", "contents_downloaded", "playlists", "applications"]:
+            # Parse JSON strings for nested arrays
+            try:
+                formatted_item[key] = json.loads(value) if value else []
+            except json.JSONDecodeError:
+                formatted_item[key] = []
+        else:
+            formatted_item[key] = value
+    
+    return formatted_item
+
+
+def create_enriched_device_response(device: Dict[str, Any], iot_assignment_result: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Create a device response with enriched related data.
+    
+    Args:
+        device: Device data dictionary
+        iot_assignment_result: Optional IoT assignment result
+        
+    Returns:
+        Success response dictionary with enriched device data
+    """
+    # First format the device for basic response
+    formatted_device = format_response_device(device)
+    
+    # Then enrich with related data
+    enriched_device = enrich_device_with_related_data(formatted_device)
+    
+    # Prepare response body
+    response_body = {"device": enriched_device}
+    
+    # Add IoT assignment result if provided
+    if iot_assignment_result:
+        response_body["iot_content_assignment"] = iot_assignment_result
+    
+    # Determine status code and message based on IoT result
+    if iot_assignment_result and not iot_assignment_result.get("success", True):
+        # Device update succeeded but IoT assignment failed
+        status_code = 207  # Multi-status: partial success
+        response_body["message"] = "Device updated successfully but IoT content assignment failed"
+        response_body["warning"] = "Content assignment to IoT device failed"
+    else:
+        # Normal success response
+        status_code = 200
+        if iot_assignment_result and iot_assignment_result.get("success"):
+            response_body["message"] = "Device updated successfully with IoT content assignment"
+        # Note: No message for regular device operations to maintain backward compatibility
+
+    return {
+        "statusCode": status_code,
+        "headers": get_cors_headers(),
+        "body": json.dumps(response_body),
+    }
+
+
+def create_enriched_devices_list_response(devices: list) -> Dict[str, Any]:
+    """
+    Create a successful response for enriched devices list.
+
+    Args:
+        devices: List of device dictionaries
+        
+    Returns:
+        Success response dictionary with enriched devices list
+    """
+    # Format and enrich devices for response
+    enriched_devices = []
+    for device in devices:
+        formatted_device = format_response_device(device)
+        enriched_device = enrich_device_with_related_data(formatted_device)
+        enriched_devices.append(enriched_device)
+
+    return {
+        "statusCode": 200,
+        "headers": get_cors_headers(),
+        "body": json.dumps(
+            {"devices": enriched_devices, "count": len(enriched_devices)}
+        ),
     }

@@ -80,9 +80,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 return create_error_response(400, DEVICE_ERROR_MESSAGES["INVALID_CONTENT_IDS"])
 
         # Store original device state for rollback
-        original_contents = existing_device.get("contents", [])
-        if isinstance(original_contents, str):
-            original_contents = json.loads(original_contents) if original_contents else []
+        original_contents_initiated = existing_device.get("contents_initiated", [])
+        original_contents_downloading = existing_device.get("contents_downloading", [])
+        original_contents_downloaded = existing_device.get("contents_downloaded", [])
+        
+        if isinstance(original_contents_initiated, str):
+            original_contents_initiated = json.loads(original_contents_initiated) if original_contents_initiated else []
+        if isinstance(original_contents_downloading, str):
+            original_contents_downloading = json.loads(original_contents_downloading) if original_contents_downloading else []
+        if isinstance(original_contents_downloaded, str):
+            original_contents_downloaded = json.loads(original_contents_downloaded) if original_contents_downloaded else []
 
         # TODO: Implement IoT content removal when IoT API becomes available
         # The IoT service doesn't currently have an API for removing content from devices
@@ -102,19 +109,34 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         database_updated = False
         
         try:
-            # Update device's content list in database by removing specified content IDs
-            current_contents = existing_device.get("contents", [])
-            if isinstance(current_contents, str):
-                current_contents = json.loads(current_contents) if current_contents else []
+            # Update device's content arrays in database by removing specified content IDs
+            current_contents_initiated = existing_device.get("contents_initiated", [])
+            current_contents_downloading = existing_device.get("contents_downloading", [])
+            current_contents_downloaded = existing_device.get("contents_downloaded", [])
             
-            # Check if content IDs exist in current contents
-            content_ids_to_remove = [cid for cid in content_ids if cid in current_contents]
+            if isinstance(current_contents_initiated, str):
+                current_contents_initiated = json.loads(current_contents_initiated) if current_contents_initiated else []
+            if isinstance(current_contents_downloading, str):
+                current_contents_downloading = json.loads(current_contents_downloading) if current_contents_downloading else []
+            if isinstance(current_contents_downloaded, str):
+                current_contents_downloaded = json.loads(current_contents_downloaded) if current_contents_downloaded else []
+            
+            # Check if content IDs exist in any of the content arrays
+            all_content_ids = current_contents_initiated + current_contents_downloading + current_contents_downloaded
+            content_ids_to_remove = [cid for cid in content_ids if cid in all_content_ids]
             if not content_ids_to_remove:
                 return create_error_response(400, "None of the specified content IDs are currently assigned to this device")
             
-            # Remove specified content IDs from existing ones
-            updated_contents = [content for content in current_contents if content not in content_ids]
-            update_data = {"contents": updated_contents}
+            # Remove specified content IDs from all content arrays
+            updated_contents_initiated = [content for content in current_contents_initiated if content not in content_ids]
+            updated_contents_downloading = [content for content in current_contents_downloading if content not in content_ids]
+            updated_contents_downloaded = [content for content in current_contents_downloaded if content not in content_ids]
+            
+            update_data = {
+                "contents_initiated": updated_contents_initiated,
+                "contents_downloading": updated_contents_downloading,
+                "contents_downloaded": updated_contents_downloaded,
+            }
             
             update_error = update_device_in_db(device_id, update_data, table_name)
             if update_error:
@@ -132,7 +154,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "success": True,
                 "message": f"{DEVICE_SUCCESS_MESSAGES['CONTENT_REMOVED']} (Database updated only)",
                 "removed_content_ids": content_ids_to_remove,
-                "remaining_contents": len(updated_contents),
+                "remaining_contents": len(updated_contents_initiated + updated_contents_downloading + updated_contents_downloaded),
                 "warning": "IoT device content removal not yet implemented. Only database was updated."
             }
             
@@ -148,7 +170,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if database_updated:
                 try:
                     print("Rolling back database changes due to error")
-                    rollback_data = {"contents": original_contents}
+                    rollback_data = {
+                        "contents_initiated": original_contents_initiated,
+                        "contents_downloading": original_contents_downloading,
+                        "contents_downloaded": original_contents_downloaded,
+                    }
                     update_device_in_db(device_id, rollback_data, table_name)
                     print("Database rollback successful")
                 except Exception as rollback_error:

@@ -137,7 +137,7 @@ def create_content_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "is_deleted": body.get("is_deleted", False),
         "assigned_to": arrays["assigned_to"],
         "organization_id": body["organization_id"],
-        "status": body.get("status", DEFAULT_CONTENT_STATUS),
+        "status": DEFAULT_CONTENT_STATUS,
         "created_at": current_time,
         "updated_at": current_time,
         "created_by": body.get("created_by", ""),

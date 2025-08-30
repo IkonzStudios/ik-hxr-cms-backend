@@ -627,6 +627,3 @@ def collect_contents_from_playlists_and_contents(
             processed_content_ids.add(content_id)
     
     return content_list, error_messages
-
-
-
