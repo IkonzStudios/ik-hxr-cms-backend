@@ -139,6 +139,20 @@ class IkHxrCmsBackendStack(Stack):
             layers=[auth_dependencies_layer, common_dependencies_layer],
         )
 
+        refresh_token_lambda = create_lambda_function(
+            scope=self,
+            construct_id="RefreshTokenFunction",
+            function_name=f"Cms-RefreshToken-{env_name_capitalized}",
+            handler="refresh_token.handler",
+            code_path="src/lambda/auth",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "ENV": env_name,
+            },
+            layers=[auth_dependencies_layer, common_dependencies_layer],
+        )
+
         # Grant Cognito permissions to auth Lambda functions
         login_lambda.add_to_role_policy(
             iam.PolicyStatement(
@@ -158,6 +172,16 @@ class IkHxrCmsBackendStack(Stack):
                 actions=[
                     "cognito-idp:AdminRespondToAuthChallenge",
                     "cognito-idp:AdminGetUser",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
+        refresh_token_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:InitiateAuth",
                 ],
                 resources=[user_pool.user_pool_arn],
             )
@@ -1182,14 +1206,17 @@ class IkHxrCmsBackendStack(Stack):
         auth_resource = api.root.add_resource("auth")
         login_resource = auth_resource.add_resource("login")
         change_password_resource = auth_resource.add_resource("change-password")
+        refresh_token_resource = auth_resource.add_resource("refresh")
 
         login_integration = apigateway.LambdaIntegration(login_lambda)
         change_password_integration = apigateway.LambdaIntegration(
             change_password_lambda
         )
+        refresh_token_integration = apigateway.LambdaIntegration(refresh_token_lambda)
 
         login_resource.add_method("POST", login_integration)
         change_password_resource.add_method("POST", change_password_integration)
+        refresh_token_resource.add_method("POST", refresh_token_integration)
 
         # Add new Cognito endpoints
         cognito_resource = api.root.add_resource("cognito")
