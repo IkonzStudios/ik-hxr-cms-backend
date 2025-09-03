@@ -623,6 +623,7 @@ class IkHxrCmsBackendStack(Stack):
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_content_from_device_lambda = create_lambda_function(
@@ -634,8 +635,11 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_DELETE_CONTENT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/ct-delete",
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_playlist_from_device_lambda = create_lambda_function(
@@ -647,8 +651,12 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_DELETE_CONTENT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/ct-delete",
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_app_from_device_lambda = create_lambda_function(
@@ -662,6 +670,7 @@ class IkHxrCmsBackendStack(Stack):
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         # Create Content Status Update Lambda function

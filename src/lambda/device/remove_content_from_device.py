@@ -10,6 +10,7 @@ from utils.helpers import (
     create_error_response,
     update_device_in_db,
 )
+from iot.remove_content import remove_content_from_device_utility
 from utils.rbac import check_edit_permission_with_org
 from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES
 
@@ -91,20 +92,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if isinstance(original_contents_downloaded, str):
             original_contents_downloaded = json.loads(original_contents_downloaded) if original_contents_downloaded else []
 
-        # TODO: Implement IoT content removal when IoT API becomes available
-        # The IoT service doesn't currently have an API for removing content from devices
-        # This functionality will need to be implemented when the IoT API is extended
-        # Expected IoT API call:
-        # success, error_msg, iot_response = remove_content_from_device_utility(
-        #     device_id=device_id,
-        #     content_ids=content_ids,
-        #     contents_table_name=contents_table_name,
-        #     content_bucket_name=content_bucket_name,
-        #     devices_table_name=table_name
-        # )
-        # 
-        # If IoT API fails, database changes should be rolled back
-        # The IoT API should accept content IDs to remove and update the device's content state
+        # Get environment variables for IoT API call
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        content_bucket_name = os.environ.get("CONTENT_BUCKET_NAME")
+        
+        if not contents_table_name:
+            return create_error_response(500, "CONTENTS_TABLE_NAME environment variable not set")
+        if not content_bucket_name:
+            return create_error_response(500, "CONTENT_BUCKET_NAME environment variable not set")
+        
+        # Call IoT API to remove content from device
+        success, error_msg, iot_response = remove_content_from_device_utility(
+            device_id=device_id,
+            content_ids=content_ids,
+            contents_table_name=contents_table_name,
+            content_bucket_name=content_bucket_name,
+            devices_table_name=table_name
+        )
+        
+        if not success:
+            return create_error_response(502, f"IoT API error: {error_msg}")
         
         database_updated = False
         
@@ -152,14 +159,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Create success result for response
             content_removal_result = {
                 "success": True,
-                "message": f"{DEVICE_SUCCESS_MESSAGES['CONTENT_REMOVED']} (Database updated only)",
+                "message": DEVICE_SUCCESS_MESSAGES['CONTENT_REMOVED'],
                 "removed_content_ids": content_ids_to_remove,
                 "remaining_contents": len(updated_contents_initiated + updated_contents_downloading + updated_contents_downloaded),
-                "warning": "IoT device content removal not yet implemented. Only database was updated."
+                "iot_response": iot_response
             }
             
-            print(f"Content removal from database successful for device {device_id}")
-            print("TODO: Implement IoT content removal when API becomes available")
+            print(f"Content removal successful for device {device_id}")
+            print(f"IoT API response: {json.dumps(iot_response, indent=2)}")
             
             return create_device_response(updated_device, {"content_removal": content_removal_result})
                 
@@ -180,7 +187,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 except Exception as rollback_error:
                     print(f"Database rollback failed: {str(rollback_error)}")
             
-            return create_error_response(500, f"{DEVICE_ERROR_MESSAGES['REMOVAL_NOT_IMPLEMENTED']}: {str(e)}")
+            return create_error_response(500, f"Content removal failed: {str(e)}")
 
     except ValueError as e:
         return create_error_response(400, str(e))

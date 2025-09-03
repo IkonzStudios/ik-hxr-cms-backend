@@ -1,6 +1,7 @@
 import json
 import os
 import traceback
+import boto3
 from typing import Dict, Any
 
 from utils.helpers import (
@@ -10,6 +11,7 @@ from utils.helpers import (
     create_error_response,
     update_device_in_db,
 )
+from iot.remove_content import remove_content_from_device_utility
 from utils.rbac import check_edit_permission_with_org
 from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES
 
@@ -84,22 +86,54 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if isinstance(original_playlists, str):
             original_playlists = json.loads(original_playlists) if original_playlists else []
 
-        # TODO: Implement IoT playlist removal when IoT API becomes available
-        # The IoT service doesn't currently have an API for removing playlists from devices
-        # This functionality will need to be implemented when the IoT API is extended
-        # Expected IoT API call:
-        # 1. Get contents from playlists being removed
-        # 2. Call remove_content_from_device_utility with those content IDs
-        # success, error_msg, iot_response = remove_content_from_device_utility(
-        #     device_id=device_id,
-        #     content_ids=content_ids_from_playlists,
-        #     contents_table_name=contents_table_name,
-        #     content_bucket_name=content_bucket_name,
-        #     devices_table_name=table_name
-        # )
-        # 
-        # If IoT API fails, database changes should be rolled back
-        # The IoT API should remove content associated with the playlists from the device
+        # Get environment variables for IoT API call
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        content_bucket_name = os.environ.get("CONTENT_BUCKET_NAME")
+        playlists_table_name = os.environ.get("PLAYLISTS_TABLE_NAME")
+        
+        if not contents_table_name:
+            return create_error_response(500, "CONTENTS_TABLE_NAME environment variable not set")
+        if not content_bucket_name:
+            return create_error_response(500, "CONTENT_BUCKET_NAME environment variable not set")
+        if not playlists_table_name:
+            return create_error_response(500, "PLAYLISTS_TABLE_NAME environment variable not set")
+        
+        # Get content IDs from playlists being removed
+        dynamodb = boto3.resource("dynamodb")
+        playlists_table = dynamodb.Table(playlists_table_name)
+        contents_table = dynamodb.Table(contents_table_name)
+        
+        content_ids_to_remove = []
+        for playlist_id in playlist_ids:
+            try:
+                response = playlists_table.get_item(Key={"id": playlist_id})
+                if "Item" in response:
+                    playlist_item = response["Item"]
+                    playlist_contents = playlist_item.get("contents", [])
+                    if isinstance(playlist_contents, str):
+                        playlist_contents = json.loads(playlist_contents) if playlist_contents else []
+                    content_ids_to_remove.extend(playlist_contents)
+            except Exception as e:
+                print(f"Error retrieving playlist {playlist_id}: {str(e)}")
+                continue
+        
+        # Remove duplicates
+        content_ids_to_remove = list(set(content_ids_to_remove))
+        
+        # Call IoT API to remove content from device if there are contents to remove
+        if content_ids_to_remove:
+            success, error_msg, iot_response = remove_content_from_device_utility(
+                device_id=device_id,
+                content_ids=content_ids_to_remove,
+                contents_table_name=contents_table_name,
+                content_bucket_name=content_bucket_name,
+                devices_table_name=table_name
+            )
+            
+            if not success:
+                return create_error_response(502, f"IoT API error: {error_msg}")
+        else:
+            iot_response = None
         
         database_updated = False
         
@@ -132,14 +166,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Create success result for response
             playlist_removal_result = {
                 "success": True,
-                "message": f"{DEVICE_SUCCESS_MESSAGES['PLAYLIST_REMOVED']} (Database updated only)",
+                "message": DEVICE_SUCCESS_MESSAGES['PLAYLIST_REMOVED'],
                 "removed_playlist_ids": playlist_ids_to_remove,
                 "remaining_playlists": len(updated_playlists),
-                "warning": "IoT device playlist removal not yet implemented. Only database was updated."
+                "content_removal": {
+                    "content_ids_removed": content_ids_to_remove,
+                    "iot_response": iot_response
+                } if content_ids_to_remove else None
             }
             
-            print(f"Playlist removal from database successful for device {device_id}")
-            print("TODO: Implement IoT playlist removal when API becomes available")
+            print(f"Playlist removal successful for device {device_id}")
+            if content_ids_to_remove:
+                print(f"Content removal via IoT API successful: {len(content_ids_to_remove)} content items removed")
+                print(f"IoT API response: {json.dumps(iot_response, indent=2)}")
+            else:
+                print("No content items to remove from device")
             
             return create_device_response(updated_device, {"playlist_removal": playlist_removal_result})
                 
@@ -156,7 +197,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 except Exception as rollback_error:
                     print(f"Database rollback failed: {str(rollback_error)}")
             
-            return create_error_response(500, f"{DEVICE_ERROR_MESSAGES['REMOVAL_NOT_IMPLEMENTED']}: {str(e)}")
+            return create_error_response(500, f"Playlist removal failed: {str(e)}")
 
     except ValueError as e:
         return create_error_response(400, str(e))
