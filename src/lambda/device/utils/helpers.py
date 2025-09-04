@@ -166,6 +166,7 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "contents_initiated": [],
         "contents_downloading": [],
         "contents_downloaded": [],
+        "base_content": "",
         "status": body.get("status", "active"),
         "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,

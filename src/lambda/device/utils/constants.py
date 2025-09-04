@@ -25,6 +25,7 @@ OPTIONAL_DEVICE_FIELDS = [
     "contents_initiated",
     "contents_downloading", 
     "contents_downloaded",
+    "base_content",
     "status",
     "storage_left",
     "storage_consumed",
@@ -41,6 +42,7 @@ DEVICE_FIELD_TYPES = {
     "model": str,  # Device model
     "version": str,  # Device version/firmware
     "ip_address": str,  # IP address
+    "base_content": str,  # Base content S3 path
     "status": str,  # Device status
     "is_deleted": bool,  # Soft delete flag
 }

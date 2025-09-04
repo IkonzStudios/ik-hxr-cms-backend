@@ -744,6 +744,36 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],
         )
 
+        # Create Base Video Upload Lambda function
+        upload_base_video_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UploadBaseVideoFunction",
+            function_name=f"Cms-UploadBaseVideo-{env_name_capitalized}",
+            handler="upload_base_video.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Create Update Device Base Content Lambda function
+        update_device_base_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateDeviceBaseContentFunction",
+            function_name=f"Cms-UpdateDeviceBaseContent-{env_name_capitalized}",
+            handler="update_device_base_content.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_UPDATE_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/lp-update",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -753,6 +783,12 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
+        grant_table_permissions(upload_base_video_lambda, devices_table, "read")
+        
+        # Grant S3 permissions to upload base video Lambda
+        grant_s3_permissions(upload_base_video_lambda, content_bucket, "write")
+        
+        grant_table_permissions(update_device_base_content_lambda, devices_table, "read_write")
 
         grant_table_permissions(create_content_lambda, contents_table, "write")
         grant_table_permissions(get_content_lambda, contents_table, "read")
@@ -986,6 +1022,16 @@ class IkHxrCmsBackendStack(Stack):
         command_resource = device_id_resource.add_resource("command")
         command_integration = apigateway.LambdaIntegration(generic_command_lambda)
         command_resource.add_method("POST", command_integration, authorizer=authorizer)
+
+        # Base Video Upload API Resource and Method
+        upload_base_video_resource = device_id_resource.add_resource("upload-base-video")
+        upload_base_video_integration = apigateway.LambdaIntegration(upload_base_video_lambda)
+        upload_base_video_resource.add_method("POST", upload_base_video_integration, authorizer=authorizer)
+
+        # Update Device Base Content API Resource and Method
+        update_base_content_resource = device_id_resource.add_resource("base-content")
+        update_base_content_integration = apigateway.LambdaIntegration(update_device_base_content_lambda)
+        update_base_content_resource.add_method("POST", update_base_content_integration, authorizer=authorizer)
         # ------------------------------------- END OF DEVICE API -------------------------------------
 
         # ------------------------------------- CONTENT API -------------------------------------

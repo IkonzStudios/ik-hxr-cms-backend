@@ -57,14 +57,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return create_error_response(400, "Invalid key: key cannot be empty")
 
         # Additional security: ensure key starts with contents/ to prevent accessing other files
-        if not s3_key.startswith("contents/"):
-            return create_error_response(400, "Invalid key: key must start with 'contents/'")
+        if not s3_key.startswith("contents/") and not s3_key.startswith("base-contents/"):
+            return create_error_response(400, "Invalid key: key must start with 'contents/' or 'base-contents/'")
 
         # Extract organization_id from the key path
         # Expected format: "contents/73ffc2ad-1551-49fa-864c-133a60e9e2ef/7fbcb394-7546-459c-ae59-3468ae77c449.mp4"
         try:
             key_parts = s3_key.split("/")
-            if len(key_parts) < 3 or key_parts[0] != "contents":
+            if len(key_parts) < 3 or key_parts[0] != "contents" and key_parts[0] != "base-contents":
                 return create_error_response(400, "Invalid key format: expected 'contents/{org_id}/{file}'")
             
             organization_id = key_parts[1]
@@ -74,13 +74,20 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Error parsing organization_id from key: {str(e)}")
             return create_error_response(400, "Invalid key format")
 
-        # RBAC: Check if user has permission to view content in this organization
-        rbac_error, user_info = check_view_permission_with_org(event, "content", organization_id)
-        if rbac_error:
-            return rbac_error
 
-        # Log user action for audit
-        print(f"User {user_info['user_id']} ({user_info['role']}) requesting presigned URL for org {organization_id}")
+        if s3_key.startswith("base-contents/"):
+            rbac_error_base, user_info_base = check_view_permission_with_org(event, "base-content", organization_id)
+            if rbac_error_base:
+                return rbac_error_base
+            else:
+                print(f"User {user_info_base['user_id']} ({user_info_base['role']}) requesting presigned URL for org {organization_id}")
+        else:
+        # RBAC: Check if user has permission to view content in this organization
+            rbac_error, user_info = check_view_permission_with_org(event, "content", organization_id)
+            if rbac_error:
+                return rbac_error
+            else:
+                print(f"User {user_info['user_id']} ({user_info['role']}) requesting presigned URL for org {organization_id}")
 
         # Generate presigned URL for viewing (GET operation)
         s3_client = boto3.client("s3")

@@ -5,10 +5,12 @@ from typing import Dict, Any, Optional
 # RBAC Permission Matrix for Content resources
 PERMISSIONS = {
     "superadmin": {
-        "content": ["upload", "edit", "delete", "view"]
+        "content": ["upload", "edit", "delete", "view"],
+        "base-content": ["view"]
     },
     "admin": {  # ORG ADMIN - can manage content within their organization
-        "content": ["upload", "edit", "delete", "view"]
+        "content": ["upload", "edit", "delete", "view"],
+        "base-content": ["view"]
     },
     "content_admin": {
         # Content admin can only approve/reject, but for content operations they need no direct permissions

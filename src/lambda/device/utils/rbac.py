@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 # RBAC Permission Matrix for Device resources
 PERMISSIONS = {
     "superadmin": {
-        "device": ["create", "edit", "delete", "view"]
+        "device": ["create", "edit", "delete", "view", "upload"]
     },
     "admin": {  # ORG ADMIN - can manage within their organization
-        "device": ["create", "edit", "delete", "view"]
+        "device": ["create", "edit", "delete", "view", "upload"]
     },
     "content_admin": {
         # No device permissions
