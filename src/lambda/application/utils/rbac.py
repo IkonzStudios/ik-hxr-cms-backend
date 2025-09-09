@@ -18,8 +18,10 @@ PERMISSIONS = {
     },
     "standard_user": {
         # No application permissions
+        "application": ["create", "edit", "delete", "view"]
     },
     "viewer": {
+        "application": ["view"]
         # No application permissions
     }
 }

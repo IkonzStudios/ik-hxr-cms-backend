@@ -14,7 +14,7 @@ PERMISSIONS = {
     },
     "content_admin": {
         # Content admin can only approve/reject, but for content operations they need no direct permissions
-        # Approval functionality would be handled separately
+        "content": ["edit", "view"],
     },
     "analytics_user": {
         # No content permissions
