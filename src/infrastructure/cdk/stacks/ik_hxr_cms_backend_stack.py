@@ -774,6 +774,23 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],
         )
 
+        # Create Status Update Lambda function
+        update_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateStatusFunction",
+            function_name=f"Cms-UpdateStatus-{env_name_capitalized}",
+            handler="update_status.handler",
+            code_path="src/lambda/status",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant table permissions to Lambda functions
         grant_table_permissions(create_device_lambda, devices_table, "write")
         grant_table_permissions(get_device_lambda, devices_table, "read")
@@ -854,6 +871,13 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
         grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
         grant_table_permissions(generic_command_lambda, devices_table, "read")
+
+        # Grant table permissions to Status Update Lambda function
+        grant_table_permissions(update_status_lambda, devices_table, "read_write")
+        grant_table_permissions(update_status_lambda, contents_table, "read_write")
+        grant_table_permissions(update_status_lambda, playlists_table, "read_write")
+        grant_table_permissions(update_status_lambda, schedules_table, "read_write")
+        grant_table_permissions(update_status_lambda, applications_table, "read_write")
 
         # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
@@ -1256,6 +1280,20 @@ class IkHxrCmsBackendStack(Stack):
             "GET", get_applications_by_org_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF APPLICATION API -------------------------------------
+
+        # ------------------------------------- STATUS API -------------------------------------
+        # API resources
+        status_resource = api.root.add_resource("status")
+
+        # Lambda integrations
+        update_status_integration = apigateway.LambdaIntegration(update_status_lambda)
+
+        # Add status API methods
+        # TODO: Add a separate authorizer for this endpoint
+        status_resource.add_method(
+            "POST", update_status_integration
+        )
+        # ------------------------------------- END OF STATUS API -------------------------------------
 
         # Add auth endpoints (no authentication required)
         auth_resource = api.root.add_resource("auth")
