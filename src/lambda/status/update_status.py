@@ -7,6 +7,8 @@ from utils.helpers import (
     parse_request_body,
     create_error_response,
     get_cors_headers,
+    get_device_by_id_from_db,
+    update_device_in_db,
 )
 
 
@@ -48,7 +50,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Extract data
         timestamp = body["timestamp"]
         device_id = body["thingName"]  # thingName is the device_id
-        content_id = body["contentId"] | 'None'
+        content_id = body.get("contentId", "None")
         job_id = body["jobId"]
         step = body["step"]
         message = body["message"]
@@ -211,16 +213,115 @@ def handle_assign_content(device_id: str, content_id: str, job_id: str, step: st
     except IndexError:
         content_index = "unknown"
     
-    # TODO: Implement assign content logic
-    # 1. Validate device exists
-    # 2. Update device content download status
-    # 3. Move content between status arrays (initiated -> downloading -> downloaded)
-    # 4. Log the download result
+    # Get table name from environment variable
+    devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
+    if not devices_table_name:
+        return {
+            "handler": "assign_content",
+            "step": step,
+            "content_index": content_index,
+            "status": "error",
+            "error": "DEVICES_TABLE_NAME environment variable not set"
+        }
+    
+    # Get the device to check its current content status
+    device, get_error = get_device_by_id_from_db(device_id, devices_table_name)
+    if get_error:
+        return {
+            "handler": "assign_content",
+            "step": step,
+            "content_index": content_index,
+            "status": "error",
+            "error": "Device not found"
+        }
+    
+    # Get current content arrays
+    contents_initiated = device.get("contents_initiated", [])
+    contents_downloading = device.get("contents_downloading", [])
+    contents_downloaded = device.get("contents_downloaded", [])
+    contents_failed = device.get("contents_failed", [])
+    
+    # Convert string arrays to lists if needed
+    if isinstance(contents_initiated, str):
+        contents_initiated = json.loads(contents_initiated) if contents_initiated else []
+    if isinstance(contents_downloading, str):
+        contents_downloading = json.loads(contents_downloading) if contents_downloading else []
+    if isinstance(contents_downloaded, str):
+        contents_downloaded = json.loads(contents_downloaded) if contents_downloaded else []
+    if isinstance(contents_failed, str):
+        contents_failed = json.loads(contents_failed) if contents_failed else []
+    
+    print(f"Current content arrays:")
+    print(f"  Initiated: {contents_initiated}")
+    print(f"  Downloading: {contents_downloading}")
+    print(f"  Downloaded: {contents_downloaded}")
+    print(f"  Failed: {contents_failed}")
+    
+    # Determine the action based on step
+    if step.endswith("_STARTED"):
+        # Move content from initiated to downloading
+        if content_id in contents_initiated:
+            contents_initiated.remove(content_id)
+            if content_id not in contents_downloading:
+                contents_downloading.append(content_id)
+            print(f"Moved {content_id} from initiated to downloading")
+        else:
+            print(f"Content {content_id} not found in initiated array")
+            
+    elif step.endswith("_SUCCESS"):
+        # Move content from downloading to downloaded
+        if content_id in contents_downloading:
+            contents_downloading.remove(content_id)
+            if content_id not in contents_downloaded:
+                contents_downloaded.append(content_id)
+            print(f"Moved {content_id} from downloading to downloaded")
+        else:
+            print(f"Content {content_id} not found in downloading array")
+            
+    elif step.endswith("_FAILED"):
+        # Move content from initiated or downloading to failed
+        if content_id in contents_initiated:
+            contents_initiated.remove(content_id)
+            print(f"Removed {content_id} from initiated array")
+        if content_id in contents_downloading:
+            contents_downloading.remove(content_id)
+            print(f"Removed {content_id} from downloading array")
+        if content_id not in contents_failed:
+            contents_failed.append(content_id)
+            print(f"Added {content_id} to failed array")
+            
+    elif step.endswith("_SKIPPED"):
+        # For skipped, we don't change the status arrays
+        print(f"Content {content_id} download was skipped")
+    
+    # Prepare update data
+    update_data = {
+        "contents_initiated": contents_initiated,
+        "contents_downloading": contents_downloading,
+        "contents_downloaded": contents_downloaded,
+        "contents_failed": contents_failed,
+    }
+    
+    # Update device in database
+    update_error = update_device_in_db(device_id, update_data, devices_table_name)
+    if update_error:
+        return {
+            "handler": "assign_content",
+            "step": step,
+            "content_index": content_index,
+            "status": "error",
+            "error": "Failed to update device in database"
+        }
     
     return {
         "handler": "assign_content",
         "step": step,
         "content_index": content_index,
         "status": "processed",
-        "todo": "Implement content status array updates"
+        "updated_arrays": {
+            "contents_initiated": contents_initiated,
+            "contents_downloading": contents_downloading,
+            "contents_downloaded": contents_downloaded,
+            "contents_failed": contents_failed,
+        }
     }

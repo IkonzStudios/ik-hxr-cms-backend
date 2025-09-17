@@ -25,6 +25,7 @@ OPTIONAL_DEVICE_FIELDS = [
     "contents_initiated",
     "contents_downloading", 
     "contents_downloaded",
+    "contents_failed",
     "base_content",
     "status",
     "storage_left",

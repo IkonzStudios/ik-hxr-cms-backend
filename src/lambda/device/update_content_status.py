@@ -105,10 +105,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         contents_initiated = device.get("contents_initiated", [])
         contents_downloading = device.get("contents_downloading", [])
         contents_downloaded = device.get("contents_downloaded", [])
+        contents_failed = device.get("contents_failed", [])
 
         print(f"Contents initiated: {contents_initiated}")
         print(f"Contents downloading: {contents_downloading}")
         print(f"Contents downloaded: {contents_downloaded}")
+        print(f"Contents failed: {contents_failed}")
 
         # Convert string arrays to lists if needed
         if isinstance(contents_initiated, str):
@@ -117,6 +119,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             contents_downloading = json.loads(contents_downloading) if contents_downloading else []
         if isinstance(contents_downloaded, str):
             contents_downloaded = json.loads(contents_downloaded) if contents_downloaded else []
+        if isinstance(contents_failed, str):
+            contents_failed = json.loads(contents_failed) if contents_failed else []
 
         # Remove content_id from all arrays first
         # if content_id in contents_initiated:
@@ -147,20 +151,23 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 if content_id in contents_downloading:
                     contents_downloading.remove(content_id)
         elif status == "failed":
-            # For failed status, we don't add to any array (content is removed from all status arrays)
+            # For failed status, move content to failed array
+            if content_id not in contents_failed:
+                contents_failed.append(content_id)
+            # Remove from other arrays
             if content_id in contents_initiated:
                 contents_initiated.remove(content_id)
             if content_id in contents_downloading:
                 contents_downloading.remove(content_id)
             if content_id in contents_downloaded:
                 contents_downloaded.remove(content_id)
-            # TODO: add content to failed array
 
         # Prepare update data
         update_data = {
             "contents_initiated": contents_initiated,
             "contents_downloading": contents_downloading,
             "contents_downloaded": contents_downloaded,
+            "contents_failed": contents_failed,
         }
 
         # Update device in database
@@ -181,6 +188,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     "contents_initiated": contents_initiated,
                     "contents_downloading": contents_downloading,
                     "contents_downloaded": contents_downloaded,
+                    "contents_failed": contents_failed,
                 }
             }),
         }

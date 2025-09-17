@@ -32,6 +32,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "contents_initiated": "[]",
         "contents_downloading": "[]",
         "contents_downloaded": "[]",
+        "contents_failed": "[]",
         "status": "active",
         "storage_left": 100.5,
         "storage_consumed": 50.2
