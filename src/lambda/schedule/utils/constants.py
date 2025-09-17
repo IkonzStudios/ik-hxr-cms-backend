@@ -23,6 +23,7 @@ OPTIONAL_SCHEDULE_FIELDS = [
     "assigned_to",
     "contents",
     "playlists",
+    "applications",
     "created_by",
     "updated_by",
 ]

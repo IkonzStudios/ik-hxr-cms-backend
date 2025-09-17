@@ -139,14 +139,14 @@ def validate_schedule_times(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Parse stringified array fields (assigned_to, contents, playlists) from the body.
+    Parse stringified array fields (assigned_to, contents, playlists, applications) from the body.
 
     Returns:
         Dictionary with parsed array values
     """
     result = {}
 
-    for field_name in ["assigned_to", "contents", "playlists"]:
+    for field_name in ["assigned_to", "contents", "playlists", "applications"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -187,6 +187,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "assigned_to": arrays["assigned_to"],
         "contents": arrays["contents"],
         "playlists": arrays["playlists"],
+        "applications": arrays["applications"],
         "organization_id": body["organization_id"],
         "created_at": current_time,
         "updated_at": current_time,
@@ -403,6 +404,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "assigned_to",
         "contents",
         "playlists",
+        "applications",
         "updated_by",
         "is_deleted",
     ]
@@ -411,7 +413,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
     for field in allowed_fields:
         if field in body:
-            if field in ["assigned_to", "contents", "playlists"]:
+            if field in ["assigned_to", "contents", "playlists", "applications"]:
                 # Handle array fields
                 arrays = parse_array_fields({field: body[field]})
                 update_data[field] = arrays[field]
@@ -543,6 +545,31 @@ def extract_s3_info_from_url(url: str, default_bucket: str) -> Tuple[str, str]:
     
     # Fallback: treat as S3 key with default bucket
     return default_bucket, url
+
+
+def get_application_by_id(application_id: str, applications_table_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Get application by ID from DynamoDB.
+    
+    Returns:
+        Tuple of (application_data, error_message)
+        If successful: (application_dict, None)
+        If error: (None, error_message)
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(applications_table_name)
+
+        response = table.get_item(Key={"id": application_id})
+
+        if "Item" not in response:
+            return None, f"Application with ID {application_id} not found"
+
+        return response["Item"], None
+
+    except Exception as e:
+        print(f"Error getting application {application_id}: {str(e)}")
+        return None, f"Error retrieving application {application_id}: {str(e)}"
 
 
 def collect_contents_from_playlists_and_contents(

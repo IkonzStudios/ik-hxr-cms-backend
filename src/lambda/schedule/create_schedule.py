@@ -12,6 +12,7 @@ from utils.helpers import (
     create_error_response,
 )
 from iot.schedule_content import schedule_content_on_iot_devices
+from iot.schedule_applications import schedule_applications_on_iot_devices
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -28,6 +29,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "assigned_to": "[\"device-id-1\", \"device-id-2\"]",
         "contents": "[\"content-id-1\", \"content-id-2\"]",
         "playlists": "[\"playlist-id-1\"]",
+        "applications": "[\"application-id-1\", \"application-id-2\"]",
         "organization_id": "123e4567-e89b-12d3-a456-426614174000",
         "created_by": "user-id-123",
         "updated_by": "user-id-123"
@@ -39,6 +41,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         schedules_table_name = os.environ.get("SCHEDULES_TABLE_NAME")
         playlists_table_name = os.environ.get("PLAYLISTS_TABLE_NAME")
         contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        applications_table_name = os.environ.get("APPLICATIONS_TABLE_NAME")
         iot_schedule_api_url = os.environ.get("IOT_SCHEDULE_API_URL")
         default_s3_bucket = os.environ.get("CONTENT_BUCKET_NAME")
         
@@ -48,6 +51,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("PLAYLISTS_TABLE_NAME environment variable not set")
         if not contents_table_name:
             raise ValueError("CONTENTS_TABLE_NAME environment variable not set")
+        if not applications_table_name:
+            raise ValueError("APPLICATIONS_TABLE_NAME environment variable not set")
         if not iot_schedule_api_url:
             raise ValueError("IOT_SCHEDULE_API_URL environment variable not set")
         if not default_s3_bucket:
@@ -66,16 +71,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if validation_error:
             return validation_error
 
-        # Validate datetime formats
-        for field in ["start_at", "end_at"]:
-            datetime_error = validate_datetime_format(body[field], field)
-            if datetime_error:
-                return datetime_error
+        if_appplication_schedule = len(body.get("applications", [])) > 0
 
-        # Validate schedule times
-        schedule_time_error = validate_schedule_times(body)
-        if schedule_time_error:
-            return schedule_time_error
+        if if_appplication_schedule:
+            print("Application schedule")
+            for field in ["start_at"]:
+                datetime_error = validate_datetime_format(body[field], field)
+                if datetime_error:
+                    return datetime_error
+        else:
+            print("Content schedule")
+            # Validate datetime formats
+            for field in ["start_at", "end_at"]:
+                datetime_error = validate_datetime_format(body[field], field)
+                if datetime_error:
+                    return datetime_error
+
+            # Validate schedule times
+            schedule_time_error = validate_schedule_times(body)
+            if schedule_time_error:
+                return schedule_time_error
 
         # Create schedule data
         schedule_data = create_schedule_data(body)
@@ -85,14 +100,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if save_error:
             return save_error
 
-        # Schedule content on IoT devices after successful DB save
-        iot_success, iot_errors, iot_responses = schedule_content_on_iot_devices(
-            schedule_data=schedule_data,
-            playlists_table_name=playlists_table_name,
-            contents_table_name=contents_table_name,
-            iot_api_url=iot_schedule_api_url,
-            default_s3_bucket=default_s3_bucket
-        )
+        iot_success = False
+        iot_errors = []
+        iot_responses = []
+        
+        if if_appplication_schedule:
+            print("Application schedule")
+            # Schedule applications on IoT devices after successful DB save
+            iot_success, iot_errors, iot_responses = schedule_applications_on_iot_devices(
+                schedule_data=schedule_data,
+                applications_table_name=applications_table_name,
+                iot_api_url=iot_schedule_api_url
+            )
+        else:
+            print("Content schedule")
+            # Schedule content on IoT devices after successful DB save
+            iot_success, iot_errors, iot_responses = schedule_content_on_iot_devices(
+                schedule_data=schedule_data,
+                playlists_table_name=playlists_table_name,
+                contents_table_name=contents_table_name,
+                iot_api_url=iot_schedule_api_url,
+                default_s3_bucket=default_s3_bucket
+            )
+
+
         
         # Create enhanced response with IoT scheduling results
         response_data = {
