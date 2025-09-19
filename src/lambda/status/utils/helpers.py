@@ -189,3 +189,75 @@ def update_device_in_db(
             "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),
         }
+
+
+# def get_content_by_url_from_db(
+#     content_url: str, table_name: str
+# ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+#     """
+#     Get a content by url from DynamoDB.
+
+#     Returns:
+#         Tuple of (content_data, error_response)
+#         If successful: (content_dict, None)
+#         If error: (None, error_response_dict)
+#     """
+#     try:
+#         dynamodb = boto3.resource("dynamodb")
+#         table = dynamodb.Table(table_name)
+#         response = table.get_item(Key={"url": content_url})
+#         if "Item" not in response:
+#             return None, {
+#                 "statusCode": 404,
+#                 "headers": get_cors_headers(),
+#                 "body": json.dumps({"error": "Content not found"}),
+#             }
+#         return response["Item"], None
+#     except Exception as e:
+#         print(f"Error getting content: {str(e)}")
+#         return None, {
+#             "statusCode": 500,
+#             "headers": get_cors_headers(),
+#             "body": json.dumps({"error": "Internal server error"}),
+#         }
+
+def get_content_by_url_from_db(
+    content_url: str, table_name: str
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Get a content by url from DynamoDB using scan operation.
+    Note: This is less efficient than get_item but necessary since url is not the primary key.
+
+    Returns:
+        Tuple of (content_data, error_response)
+        If successful: (content_dict, None)
+        If error: (None, error_response_dict)
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        
+        # Use scan to find content by url since url is not the primary key
+        # Use ExpressionAttributeNames to handle reserved keyword 'url'
+        response = table.scan(
+            FilterExpression="#url = :url",
+            ExpressionAttributeNames={"#url": "url"},
+            ExpressionAttributeValues={":url": content_url}
+        )
+        
+        if not response.get("Items"):
+            return None, {
+                "statusCode": 404,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "Content not found"}),
+            }
+        
+        # Return the first matching item
+        return response["Items"][0], None
+    except Exception as e:
+        print(f"Error getting content: {str(e)}")
+        return None, {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }

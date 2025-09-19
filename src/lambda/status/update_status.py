@@ -1,7 +1,9 @@
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
+
+import boto3
 
 from utils.helpers import (
     parse_request_body,
@@ -9,6 +11,7 @@ from utils.helpers import (
     get_cors_headers,
     get_device_by_id_from_db,
     update_device_in_db,
+    get_content_by_url_from_db,
 )
 
 
@@ -50,21 +53,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Extract data
         timestamp = body["timestamp"]
         device_id = body["thingName"]  # thingName is the device_id
-        content_id = body.get("contentId", "None")
+        content_key = body.get("key", "None")
         job_id = body["jobId"]
         step = body["step"]
         message = body["message"]
 
         print(f"Processing status update:")
         print(f"  Device ID: {device_id}")
-        print(f"  Content ID: {content_id}")
+        print(f"  Content Key: {content_key}")
         print(f"  Job ID: {job_id}")
         print(f"  Step: {step}")
         print(f"  Message: {message}")
         print(f"  Timestamp: {timestamp}")
 
         # Route to appropriate handler based on step type
-        result = route_status_update(device_id, content_id, job_id, step, message, timestamp, body)
+        result = route_status_update(device_id, content_key, job_id, step, message, timestamp, body)
 
         return {
             "statusCode": 200,
@@ -72,7 +75,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "body": json.dumps({
                 "message": "Status update processed successfully",
                 "device_id": device_id,
-                "content_id": content_id,
+                "content_key": content_key,
                 "job_id": job_id,
                 "step": step,
                 "result": result
@@ -89,7 +92,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return create_error_response(500, "Internal server error")
 
 
-def route_status_update(device_id: str, content_id: str, job_id: str, step: str, message: str, timestamp: str, full_body: Dict[str, Any]) -> Dict[str, Any]:
+def route_status_update(device_id: str, content_key: str, job_id: str, step: str, message: str, timestamp: str, full_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Route the status update to the appropriate handler based on step type.
     """
@@ -108,9 +111,39 @@ def route_status_update(device_id: str, content_id: str, job_id: str, step: str,
         # TODO:
         return handle_schedule_content(device_id, job_id, step, message, timestamp, full_body)
     elif step in delete_steps:
-        # TODO:
-        return handle_delete_content(device_id, job_id, step, message, timestamp, full_body)
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        if not contents_table_name:
+            return {
+                "handler": "delete_content",
+                "status": "error",
+                "error": "CONTENTS_TABLE_NAME environment variable not set"
+            }
+        content, get_error = get_content_by_url_from_db(content_key, contents_table_name)
+        if get_error:
+            return {
+                "handler": "delete_content",
+                "status": "error",
+                "error": "Content not found"
+            }
+        content_id = content["id"]
+        return handle_delete_content(device_id, content_id, job_id, step, message, timestamp, full_body)
     elif step in assign_steps:
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        if not contents_table_name:
+            return {
+                "handler": "assign_content",
+                "status": "error",
+                "error": "CONTENTS_TABLE_NAME environment variable not set"
+            }
+        content, get_error = get_content_by_url_from_db(content_key, contents_table_name)
+        if get_error:
+            return {
+                "handler": "assign_content",
+                "status": "error",
+                "error": "Content not found"
+            }
+        content_id = content["id"]
+        print(f"Content ID: {content_id}")
         return handle_assign_content(device_id, content_id, job_id, step, message, timestamp, full_body)
     else:
         return {
@@ -167,7 +200,7 @@ def handle_schedule_content(device_id: str, job_id: str, step: str, message: str
     }
 
 
-def handle_delete_content(device_id: str, job_id: str, step: str, message: str, timestamp: str, full_body: Dict[str, Any]) -> Dict[str, Any]:
+def handle_delete_content(device_id: str, content_id: str, job_id: str, step: str, message: str, timestamp: str, full_body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle Delete Content steps:
     - DELETE_n_SUCCESS
