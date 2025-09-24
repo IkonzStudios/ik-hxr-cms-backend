@@ -631,7 +631,9 @@ def create_enriched_device_response(device: Dict[str, Any], iot_assignment_resul
     formatted_device = format_response_device(device)
     
     # Then enrich with related data
-    enriched_device = enrich_device_with_related_data(formatted_device)
+    # TODO: Uncomment this later
+    # enriched_device = enrich_device_with_related_data(formatted_device)
+    enriched_device = formatted_device.copy()
     
     # Prepare response body
     response_body = {"device": enriched_device}
