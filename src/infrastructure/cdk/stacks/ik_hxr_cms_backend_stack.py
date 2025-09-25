@@ -243,6 +243,18 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        update_device_last_seen_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateDeviceLastSeenFunction",
+            function_name=f"Cms-UpdateDeviceLastSeen-{env_name_capitalized}",
+            handler="update_device_last_seen.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create Content Lambda functions
         create_content_lambda = create_lambda_function(
             scope=self,
@@ -801,6 +813,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
+        grant_table_permissions(update_device_last_seen_lambda, devices_table, "read_write")
         grant_table_permissions(upload_base_video_lambda, devices_table, "read")
         
         # Grant S3 permissions to upload base video Lambda
@@ -966,6 +979,7 @@ class IkHxrCmsBackendStack(Stack):
         device_id_resource = device_resource.add_resource("{id}")
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
+        device_last_seen_resource = device_resource.add_resource("status")
 
         # Lambda integrations for basic device operations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
@@ -973,6 +987,9 @@ class IkHxrCmsBackendStack(Stack):
         update_device_integration = apigateway.LambdaIntegration(update_device_lambda)
         get_devices_by_org_integration = apigateway.LambdaIntegration(
             get_devices_by_org_lambda
+        )
+        update_device_last_seen_integration = apigateway.LambdaIntegration(
+            update_device_last_seen_lambda
         )
 
         # Basic device API methods
@@ -987,6 +1004,11 @@ class IkHxrCmsBackendStack(Stack):
         )
         org_id_resource.add_method(
             "GET", get_devices_by_org_integration, authorizer=authorizer
+        )
+        
+        # Device last seen update endpoint (no auth required for device self-reporting)
+        device_last_seen_resource.add_method(
+            "POST", update_device_last_seen_integration
         )
 
         # Device Assignment API Resources and Methods
