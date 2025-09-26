@@ -29,7 +29,9 @@ synth-stage = "cdk synth --profile ik --context env=stage"
 synth-prod = "cdk synth --profile ik --context env=prod"
 
 # Development helpers
-bootstrap = "cdk bootstrap --profile ik"
+bootstrap-dev = "cdk bootstrap --profile ik --context env=dev"
+bootstrap-stage = "cdk bootstrap --profile ik --context env=stage"
+bootstrap-prod = "cdk bootstrap --profile ik --context env=prod"
 lint = "python -m flake8 src/ --max-line-length=120"
 test = "python -m pytest tests/"
 format = "python -m black src/"
