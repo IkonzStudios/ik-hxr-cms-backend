@@ -11,6 +11,7 @@ import traceback
 from typing import Dict, Any, List, Tuple, Optional
 import boto3
 
+from utils.constants import IOT_API_URL
 
 def assign_content_to_device_utility(
     device_id: str, 
@@ -37,7 +38,7 @@ def assign_content_to_device_utility(
         # Get environment variables
         if not devices_table_name:
             devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_assign_api_url = os.environ.get("IOT_ASSIGN_API_URL", "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign")
+        iot_assign_api_url = os.environ.get("IOT_ASSIGN_API_URL", IOT_API_URL + "/assign")
         
         if not devices_table_name:
             return False, "DEVICES_TABLE_NAME environment variable not set", None

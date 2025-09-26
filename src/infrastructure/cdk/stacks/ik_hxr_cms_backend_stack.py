@@ -39,6 +39,8 @@ class IkHxrCmsBackendStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
+
         env_name_capitalized = env_name.capitalize() if env_name else "Dev"
 
         # Create purpose-specific Lambda layers
@@ -227,7 +229,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -364,7 +366,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
-                "IOT_SCHEDULE_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/schedule",
+                "IOT_SCHEDULE_API_URL": IOT_API_URL + "/schedule",
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "ENV": env_name,
             },
@@ -631,7 +633,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -648,7 +650,7 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -678,7 +680,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_DELETE_CONTENT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/ct-delete",
+                "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -695,7 +697,7 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_DELETE_CONTENT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/ct-delete",
+                "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -738,7 +740,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -752,7 +754,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -766,7 +768,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -780,7 +782,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_COMMAND_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/command",
+                "IOT_COMMAND_API_URL": IOT_API_URL + "/command",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -810,7 +812,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_UPDATE_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/lp-update",
+                "IOT_UPDATE_API_URL": IOT_API_URL + "/lp-update",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
