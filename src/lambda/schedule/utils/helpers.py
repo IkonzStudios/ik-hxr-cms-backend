@@ -629,7 +629,9 @@ def collect_contents_from_playlists_and_contents(
                 s3_bucket, s3_key = extract_s3_info_from_url(content_url, default_s3_bucket)
                 content_list.append({
                     "s3Bucket": s3_bucket,
-                    "s3Key": s3_key
+                    "s3Key": s3_key,
+                    "id": content_id,
+                    "duration": content_data.get("duration", "0"),
                 })
                 processed_content_ids.add(content_id)
     
@@ -649,8 +651,81 @@ def collect_contents_from_playlists_and_contents(
             s3_bucket, s3_key = extract_s3_info_from_url(content_url, default_s3_bucket)
             content_list.append({
                 "s3Bucket": s3_bucket,
-                "s3Key": s3_key
+                "s3Key": s3_key,
+                "id": content_id,
+                "duration": content_data.get("duration", "0"),
             })
             processed_content_ids.add(content_id)
     
     return content_list, error_messages
+
+
+def calculate_times_played(contents, time_difference, count_started=True):
+    """
+    Calculate how many times each content in the playlist is played 
+    within a given time interval.
+    
+    Args:
+        contents (list[int]): List of durations (seconds) of each content.
+        time_difference (int): Total time interval in seconds.
+        count_started (bool): 
+            - True  => count if content starts within the interval
+            - False => count only if content finishes within the interval
+
+    Returns:
+        list[int]: Number of times each content is played.
+    """
+    n = len(contents)
+    result = [0] * n
+
+    total_duration = sum(contents)
+    full_loops = time_difference // total_duration
+    remaining_time = time_difference % total_duration
+
+    # Each content is played full_loops times
+    for i in range(n):
+        result[i] += full_loops
+
+    # Handle remaining time
+    for i in range(n):
+        if count_started:
+            if remaining_time > 0:   # started play counts
+                result[i] += 1
+                remaining_time -= contents[i]
+            else:
+                break
+        else:
+            if remaining_time >= contents[i]:  # full play fits
+                result[i] += 1
+                remaining_time -= contents[i]
+            else:
+                break
+
+    return result
+
+
+def save_playback_data(playback_data: Dict[str, Any], table_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Save playback data to DynamoDB.
+
+    Returns:
+        None if successful, error response dict if failed
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        table.put_item(
+            Item=playback_data, ConditionExpression="attribute_not_exists(id)"
+        )
+        return None
+
+    except Exception as e:
+        print(f"Error creating playback: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Error message: {str(e)}")
+        return {
+            "statusCode": 409,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Playback with this ID already exists"}),
+        }

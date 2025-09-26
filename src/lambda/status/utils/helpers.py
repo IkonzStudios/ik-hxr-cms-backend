@@ -3,7 +3,7 @@ import boto3
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 
 
 def get_cors_headers() -> Dict[str, str]:
@@ -257,6 +257,72 @@ def get_content_by_url_from_db(
     except Exception as e:
         print(f"Error getting content: {str(e)}")
         return None, {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
+
+
+def get_playbacks_by_job_id_from_db(
+    job_id: str, device_id: str, table_name: str
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Get a playback by ID from DynamoDB.
+
+    Returns:
+        Tuple of (playback_data, error_response)
+        If successful: (playback_dict, None)
+        If error: (None, error_response_dict)
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        resp = table.scan(
+            FilterExpression="#job = :job AND #dev = :dev",
+            ExpressionAttributeNames={"#job": "job_id", "#dev": "device_id"},
+            ExpressionAttributeValues={":job": job_id, ":dev": device_id},
+        )
+        items = resp.get("Items", [])
+        if not items:
+            return [], None  # or 404 if you prefer
+        return items, None
+
+    except Exception as e:
+        print(f"Error getting playback: {str(e)}")
+        return None, {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
+
+
+def update_playbacks_in_db(
+    update_data: List[Dict[str, Any]], table_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Update a list of playbacks in DynamoDB.
+
+    Returns:
+        None if successful, error response dict if failed
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        for playback in update_data:
+            table.update_item(
+                Key={"id": playback["id"]},
+                UpdateExpression="SET #status = :status",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={":status": playback["status"]},
+            )
+
+        return None
+
+    except Exception as e:
+        print(f"Error updating playback: {str(e)}")
+        return {
             "statusCode": 500,
             "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),

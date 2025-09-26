@@ -12,6 +12,8 @@ from utils.helpers import (
     get_device_by_id_from_db,
     update_device_in_db,
     get_content_by_url_from_db,
+    get_playbacks_by_job_id_from_db,
+    update_playbacks_in_db,
 )
 
 
@@ -102,7 +104,8 @@ def route_status_update(device_id: str, content_key: str, job_id: str, step: str
     schedule_steps = ["VERIFY_CONTENT_STARTED", "VERIFY_CONTENT_SUCCESS", "CREATE_PLAYLIST_STARTED", "CREATE_PLAYLIST_SUCCESS"]
     delete_steps = ["DELETE_1_SUCCESS", "DELETE_1_SKIPPED", "DELETE_1_FAILED", "DELETE_2_SUCCESS", "DELETE_2_SKIPPED", "DELETE_2_FAILED", "DELETE_3_SUCCESS", "DELETE_3_SKIPPED", "DELETE_3_FAILED"]
     assign_steps = ["DOWNLOAD_1_SKIPPED", "DOWNLOAD_1_STARTED", "DOWNLOAD_1_SUCCESS", "DOWNLOAD_1_FAILED", "DOWNLOAD_2_SKIPPED", "DOWNLOAD_2_STARTED", "DOWNLOAD_2_SUCCESS", "DOWNLOAD_2_FAILED", "DOWNLOAD_3_SKIPPED", "DOWNLOAD_3_STARTED", "DOWNLOAD_3_SUCCESS", "DOWNLOAD_3_FAILED"]
-    
+    playback_steps = ["PLAYBACK_STARTED", "PLAYBACK_ENDED"]
+
     # Check if step matches any known patterns
     if step in loop_update_steps:
         # TODO:
@@ -145,6 +148,8 @@ def route_status_update(device_id: str, content_key: str, job_id: str, step: str
         content_id = content["id"]
         print(f"Content ID: {content_id}")
         return handle_assign_content(device_id, content_id, job_id, step, message, timestamp, full_body)
+    elif step in playback_steps:
+        return handle_playback_content(device_id, job_id, step, message, timestamp, full_body)
     else:
         return {
             "status": "unknown_step",
@@ -357,4 +362,81 @@ def handle_assign_content(device_id: str, content_id: str, job_id: str, step: st
             "contents_downloaded": contents_downloaded,
             "contents_failed": contents_failed,
         }
+    }
+
+
+def handle_playback_content(device_id: str, job_id: str, step: str, message: str, timestamp: str, full_body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle Playback Content steps:
+    - PLAYBACK_STARTED
+    - PLAYBACK_ENDED
+    """
+    print(f"Handling Playback Content: {step}")
+
+    if step == "PLAYBACK_STARTED":
+        playbacks_table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
+        if not playbacks_table_name:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "PLAYBACKS_TABLE_NAME environment variable not set"
+            }
+        playbacks, get_error = get_playbacks_by_job_id_from_db(job_id, device_id, playbacks_table_name)
+        if get_error:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "Playback not found"
+            }
+        for playback in playbacks:
+            playback["status"] = "started"
+        update_error = update_playbacks_in_db(playbacks, playbacks_table_name)
+        if update_error:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "Failed to update playback in database"
+            }
+    elif step == "PLAYBACK_ENDED":
+        playbacks_table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
+        if not playbacks_table_name:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "PLAYBACKS_TABLE_NAME environment variable not set"
+            }
+        playbacks, get_error = get_playbacks_by_job_id_from_db(job_id, device_id, playbacks_table_name)
+        if get_error:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "Playback not found"
+            }
+        for playback in playbacks:
+            playback["status"] = "ended"
+        update_error = update_playbacks_in_db(playbacks, playbacks_table_name)
+        if update_error:
+            return {
+                "handler": "playback_content",
+                "step": step,
+                "status": "error",
+                "error": "Failed to update playback in database"
+            }
+    else:
+        return {
+            "handler": "playback_content",
+            "step": step,
+            "status": "error",
+            "error": "Invalid step"
+        }
+    
+    return {
+        "handler": "playback_content",
+        "step": step,
+        "status": "error",
     }
