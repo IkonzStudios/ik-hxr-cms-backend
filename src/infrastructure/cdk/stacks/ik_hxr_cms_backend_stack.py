@@ -371,6 +371,7 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
                 "IOT_SCHEDULE_API_URL": IOT_API_URL + "/schedule",
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "DEVICES_TABLE_NAME": devices_table.table_name,
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -870,6 +871,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(create_schedule_lambda, contents_table, "read")
         grant_table_permissions(create_schedule_lambda, applications_table, "read")
         grant_table_permissions(create_schedule_lambda, playbacks_table, "write")
+        grant_table_permissions(create_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")

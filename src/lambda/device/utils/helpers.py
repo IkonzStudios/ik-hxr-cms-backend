@@ -171,6 +171,8 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "status": body.get("status", "active"),
         "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,
+        "cpu_usage": 0,
+        "memory_usage": 0,
         "last_updated": current_time,
         "storage_left": storage["storage_left"],
         "storage_consumed": storage["storage_consumed"],
@@ -223,6 +225,13 @@ def format_response_device(device_data: Dict[str, Any]) -> Dict[str, Any]:
         response_device["storage_left"] = float(response_device["storage_left"])
     if response_device.get("storage_consumed") is not None:
         response_device["storage_consumed"] = float(response_device["storage_consumed"])
+    if response_device.get("cpu_usage") is not None:
+        response_device["cpu_usage"] = float(response_device["cpu_usage"])
+    if response_device.get("memory_usage") is not None:
+        response_device["memory_usage"] = float(response_device["memory_usage"])
+    
+    if response_device.get("schedules") is not None and isinstance(response_device.get("schedules"), str):
+        response_device["schedules"] = json.loads(response_device["schedules"])
 
     return response_device
 

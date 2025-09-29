@@ -199,7 +199,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def save_schedule_to_db(
-    schedule_data: Dict[str, Any], table_name: str
+    schedule_data: Dict[str, Any], table_name: str, device_table_name: str
 ) -> Optional[Dict[str, Any]]:
     """
     Save schedule data to DynamoDB.
@@ -214,6 +214,36 @@ def save_schedule_to_db(
         table.put_item(
             Item=schedule_data, ConditionExpression="attribute_not_exists(id)"
         )
+        device_table = dynamodb.Table(device_table_name)
+        
+        # Use batch_get_item correctly - it's called on the DynamoDB resource, not the table
+        response = dynamodb.batch_get_item(
+            RequestItems={
+                device_table_name: {
+                    'Keys': [{"id": device_id} for device_id in schedule_data["assigned_to"]]
+                }
+            }
+        )
+        
+        # Process the response correctly
+        devices_data = response.get('Responses', {}).get(device_table_name, [])
+        
+        print(f"Devices data: {devices_data}")
+        for device_data in devices_data:
+            schedules = json.loads(device_data.get("schedules", "[]"))
+            schedules.append(schedule_data["id"])
+            print(f"Schedules: {schedules}")
+            device_table.update_item(
+                Key={"id": device_data["id"]},
+                UpdateExpression="SET schedules = :schedules",
+                ExpressionAttributeValues={":schedules": schedules}
+            )
+        
+        # Check for unprocessed keys (devices that weren't found)
+        unprocessed_keys = response.get('UnprocessedKeys', {})
+        if unprocessed_keys:
+            print(f"Some devices were not found: {unprocessed_keys}")
+        
         return None
 
     except Exception as e:

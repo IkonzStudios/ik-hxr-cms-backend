@@ -48,6 +48,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         playbacks_table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
         iot_schedule_api_url = os.environ.get("IOT_SCHEDULE_API_URL")
         default_s3_bucket = os.environ.get("CONTENT_BUCKET_NAME")
+        device_table_name = os.environ.get("DEVICES_TABLE_NAME")
         
         if not schedules_table_name:
             raise ValueError("SCHEDULES_TABLE_NAME environment variable not set")
@@ -63,6 +64,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("CONTENT_BUCKET_NAME environment variable not set")
         if not playbacks_table_name:
             raise ValueError("PLAYBACKS_TABLE_NAME environment variable not set")
+        if not device_table_name:
+            raise ValueError("DEVICES_TABLE_NAME environment variable not set")
 
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
@@ -102,7 +105,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         schedule_data = create_schedule_data(body)
 
         # Save to database
-        save_error = save_schedule_to_db(schedule_data, schedules_table_name)
+        save_error = save_schedule_to_db(schedule_data, schedules_table_name, device_table_name)
         if save_error:
             return save_error
 
