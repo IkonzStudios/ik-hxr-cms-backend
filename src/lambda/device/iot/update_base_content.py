@@ -9,7 +9,7 @@ import traceback
 from typing import Dict, Any, Tuple, Optional
 import boto3
 
-from utils.constants import IOT_API_URL
+# IOT_API_URL is now obtained from environment variables
 
 
 def update_device_base_content_utility(
@@ -35,10 +35,13 @@ def update_device_base_content_utility(
         # Get environment variables
         if not devices_table_name:
             devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_update_api_url = os.environ.get("IOT_UPDATE_API_URL", IOT_API_URL + "/lp-update")
+        iot_update_api_url = os.environ.get("IOT_UPDATE_API_URL")
         
         if not devices_table_name:
             return False, "DEVICES_TABLE_NAME environment variable not set", None
+            
+        if not iot_update_api_url:
+            return False, "IOT_UPDATE_API_URL environment variable not set", None
 
         # Validate inputs
         if not device_id or not isinstance(device_id, str):

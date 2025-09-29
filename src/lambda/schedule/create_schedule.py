@@ -142,24 +142,29 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         
         if iot_success:
-            current_time = datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
-            for playback_payload in playback_payloads_to_be_created:
-                device_response = response_data["iot_scheduling"]["device_responses"]
-                playback_response = next((x for x in device_response if x["device_id"] == playback_payload["device_id"]), None)
-                playback_payload["id"] = str(uuid.uuid4())
-                playback_payload["schedule_id"] = schedule_data["id"]
-                playback_payload["job_id"] = playback_response["response"]["jobId"]
-                playback_payload["organization_id"] = schedule_data["organization_id"]
-                playback_payload["created_at"] = current_time
-                playback_payload["updated_at"] = current_time
+            if if_appplication_schedule:
+                print("Application schedule")
+            else:
+                print("Content schedule")
+                current_time = datetime.now(timezone(timedelta(hours=5, minutes=30))).isoformat()
+                for playback_payload in playback_payloads_to_be_created:
+                    device_response = response_data["iot_scheduling"]["device_responses"]
+                    playback_response = next((x for x in device_response if x["device_id"] == playback_payload["device_id"]), None)
+                    playback_payload["id"] = str(uuid.uuid4())
+                    playback_payload["schedule_id"] = schedule_data["id"]
+                    playback_payload["job_id"] = playback_response["response"]["jobId"]
+                    playback_payload["organization_id"] = schedule_data["organization_id"]
+                    playback_payload["created_at"] = current_time
+                    playback_payload["updated_at"] = current_time
 
-            # create playback data
-            for playback_payload in playback_payloads_to_be_created:
-                playback_error = save_playback_data(playback_payload, playbacks_table_name)
-                if playback_error:
-                    return playback_error
+                # create playback data
+                for playback_payload in playback_payloads_to_be_created:
+                    playback_error = save_playback_data(playback_payload, playbacks_table_name)
+                    if playback_error:
+                        return playback_error
 
-            print(f"Playback payloads to be created: {playback_payloads_to_be_created}")
+                print(f"Playback payloads to be created: {playback_payloads_to_be_created}")
+
             return {
                 "statusCode": 201,
                 "headers": {

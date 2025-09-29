@@ -58,12 +58,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return parse_error
 
         # Extract base_content from request body
+        base_content_id = body.get("base_content_id")
         base_content = body.get("base_content")
+
         if not base_content:
             return {
                 "statusCode": 400,
                 "headers": get_cors_headers(),
                 "body": json.dumps({"error": "base_content is required"}),
+            }
+        
+        if not base_content_id:
+            return {
+                "statusCode": 400,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "base_content_id is required"}),
             }
 
         # Validate base_content format
@@ -97,6 +106,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Prepare update data
         update_data = {
+            "base_content_id": base_content_id,
             "base_content": base_content,
             "updated_by": user_info["user_id"]
         }

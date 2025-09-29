@@ -255,6 +255,9 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
         )
@@ -846,6 +849,9 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
         grant_table_permissions(update_device_last_seen_lambda, devices_table, "read_write")
+        grant_table_permissions(update_device_last_seen_lambda, contents_table, "read")
+        grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
+        grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
         grant_table_permissions(upload_base_video_lambda, devices_table, "read")
         
         # Grant S3 permissions to upload base video Lambda
