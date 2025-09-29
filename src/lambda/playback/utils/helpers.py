@@ -282,7 +282,7 @@ def get_playback_by_id_from_db(
 
 
 def get_playbacks_by_org_id_from_db(
-    org_id: str, table_name: str
+    org_id: str, table_name: str, contents_table_name: str, schedules_table_name: str
 ) -> Tuple[Optional[list], Optional[Dict[str, Any]]]:
     """
     Get all playbacks by organization ID from DynamoDB.
@@ -301,7 +301,20 @@ def get_playbacks_by_org_id_from_db(
             ExpressionAttributeValues={":org_id": org_id},
         )
 
-        return response.get("Items", []), None
+        playbacks = response.get("Items", [])
+        for playback in playbacks:
+            content_id = playback.get("content_id")
+            content_data, content_error = get_content_by_id_from_db(content_id, contents_table_name)
+            if content_error:
+                return None, content_error
+            playback["content"] = content_data
+            schedule_id = playback.get("schedule_id")
+            schedule_data, schedule_error = get_schedule_by_id_from_db(schedule_id, schedules_table_name)
+            if schedule_error:
+                return None, schedule_error
+            playback["schedule"] = schedule_data
+
+        return playbacks, None
 
     except Exception as e:
         print(f"Error getting playbacks by organization ID: {str(e)}")
@@ -439,3 +452,41 @@ def create_playback_response(playback: Dict[str, Any]) -> Dict[str, Any]:
             {"message": "Playback retrieved successfully", "data": playback}
         ),
     }
+
+def get_content_by_id_from_db(
+    content_id: str, table_name: str
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Get content by ID from DynamoDB.
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        response = table.get_item(Key={"id": content_id})
+        return response["Item"], None
+    except Exception as e:
+        print(f"Error getting content: {str(e)}")
+        return None, {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
+
+def get_schedule_by_id_from_db(
+    schedule_id: str, table_name: str
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Get schedule by ID from DynamoDB.
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        response = table.get_item(Key={"id": schedule_id})
+        return response["Item"], None
+    except Exception as e:
+        print(f"Error getting schedule: {str(e)}")
+        return None, {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }

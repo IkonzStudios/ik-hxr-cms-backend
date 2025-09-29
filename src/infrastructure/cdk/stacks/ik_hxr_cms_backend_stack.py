@@ -465,19 +465,6 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
-        get_playback_lambda = create_lambda_function(
-            scope=self,
-            construct_id="GetPlaybackFunction",
-            function_name=f"Cms-GetPlayback-{env_name_capitalized}",
-            handler="get_playback_by_id.handler",
-            code_path="src/lambda/playback",
-            environment={
-                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
-                "ENV": env_name,
-            },
-            layers=[common_dependencies_layer],
-        )
-
         get_playbacks_by_org_lambda = create_lambda_function(
             scope=self,
             construct_id="GetPlaybacksByOrgFunction",
@@ -486,6 +473,8 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/playback",
             environment={
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -881,8 +870,9 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
         grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
 
-        grant_table_permissions(get_playback_lambda, playbacks_table, "read")
         grant_table_permissions(get_playbacks_by_org_lambda, playbacks_table, "read")
+        grant_table_permissions(get_playbacks_by_org_lambda, contents_table, "read")
+        grant_table_permissions(get_playbacks_by_org_lambda, schedules_table, "read")
 
         grant_table_permissions(get_user_lambda, users_table, "read")
         grant_table_permissions(update_user_lambda, users_table, "read_write")
@@ -1255,21 +1245,17 @@ class IkHxrCmsBackendStack(Stack):
         # ------------------------------------- PLAYBACK API -------------------------------------
         # API resources
         playback_resource = api.root.add_resource("playback")
-        playback_id_resource = playback_resource.add_resource("{id}")
         playback_organization_resource = playback_resource.add_resource("organization")
         playback_org_id_resource = playback_organization_resource.add_resource(
             "{orgId}"
         )
 
         # Lambda integrations
-        get_playback_integration = apigateway.LambdaIntegration(get_playback_lambda)
         get_playbacks_by_org_integration = apigateway.LambdaIntegration(
             get_playbacks_by_org_lambda
         )
 
         # Add playback API methods
-        # Get APIs with authorizer (for authenticated users)
-        playback_id_resource.add_method("GET", get_playback_integration, authorizer=authorizer)
         playback_org_id_resource.add_method("GET", get_playbacks_by_org_integration, authorizer=authorizer)
         # ------------------------------------- END OF PLAYBACK API -------------------------------------
 

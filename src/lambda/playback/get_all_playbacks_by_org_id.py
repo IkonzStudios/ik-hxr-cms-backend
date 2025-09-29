@@ -9,7 +9,7 @@ from utils.helpers import (
 from utils.rbac import check_view_permission
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda handler for getting all playbacks by organization ID.
 
@@ -46,11 +46,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Get table name from environment
         table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
+        contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
+        schedules_table_name = os.environ.get("SCHEDULES_TABLE_NAME")
         if not table_name:
             return create_error_response(500, "Table name not configured")
+        if not contents_table_name:
+            return create_error_response(500, "Contents table name not configured")
+        if not schedules_table_name:
+            return create_error_response(500, "Schedules table name not configured")
 
         # Get playbacks by organization ID
-        playbacks, error_response = get_playbacks_by_org_id_from_db(org_id, table_name)
+        playbacks, error_response = get_playbacks_by_org_id_from_db(org_id, table_name, contents_table_name, schedules_table_name)
         if error_response:
             return error_response
 
