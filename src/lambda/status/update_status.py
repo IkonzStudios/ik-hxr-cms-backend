@@ -103,7 +103,6 @@ def route_status_update(device_id: str, content_key: str, job_id: str, step: str
     loop_update_steps = ["LOOP_UPDATE_FAILED", "LOOP_REPLACE_SUCCESS", "LOOP_REPLACE_FAILED"]
     schedule_steps = ["VERIFY_CONTENT_STARTED", "VERIFY_CONTENT_SUCCESS", "CREATE_PLAYLIST_STARTED", "CREATE_PLAYLIST_SUCCESS"]
     delete_steps = ["DELETE_1_SUCCESS", "DELETE_1_SKIPPED", "DELETE_1_FAILED", "DELETE_2_SUCCESS", "DELETE_2_SKIPPED", "DELETE_2_FAILED", "DELETE_3_SUCCESS", "DELETE_3_SKIPPED", "DELETE_3_FAILED"]
-    assign_steps = ["DOWNLOAD_1_SKIPPED", "DOWNLOAD_1_STARTED", "DOWNLOAD_1_SUCCESS", "DOWNLOAD_1_FAILED", "DOWNLOAD_2_SKIPPED", "DOWNLOAD_2_STARTED", "DOWNLOAD_2_SUCCESS", "DOWNLOAD_2_FAILED", "DOWNLOAD_3_SKIPPED", "DOWNLOAD_3_STARTED", "DOWNLOAD_3_SUCCESS", "DOWNLOAD_3_FAILED"]
     playback_steps = ["PLAYBACK_STARTED", "PLAYBACK_ENDED"]
 
     # Check if step matches any known patterns
@@ -130,7 +129,7 @@ def route_status_update(device_id: str, content_key: str, job_id: str, step: str
             }
         content_id = content["id"]
         return handle_delete_content(device_id, content_id, job_id, step, message, timestamp, full_body)
-    elif step in assign_steps:
+    elif step.startswith("DOWNLOAD_"):
         contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
         if not contents_table_name:
             return {

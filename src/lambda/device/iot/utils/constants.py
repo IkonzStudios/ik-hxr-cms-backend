@@ -1,5 +1,3 @@
-IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
-
 # Required fields for device creation
 REQUIRED_DEVICE_FIELDS = [
     {
