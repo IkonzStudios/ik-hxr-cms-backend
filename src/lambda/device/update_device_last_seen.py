@@ -112,7 +112,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # total machine seconds running - total schedule seconds = base content running
             base_content_running = total_machine_seconds_running - total_schedule_seconds
             print(f"Base content running: {base_content_running}")
-            start_at = current_time
 
             dynamodb = boto3.resource("dynamodb")
             content_table = dynamodb.Table(contents_table_name)
@@ -145,6 +144,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         "updated_at": current_time,
                     }
                 )
+
+            start_at = current_time
         else:
             print("Last seen date is today")
 

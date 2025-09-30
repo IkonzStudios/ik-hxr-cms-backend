@@ -6,6 +6,7 @@ import uuid
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
+from botocore.config import Config
 from utils.rbac import check_upload_permission_with_org
 
 
@@ -189,7 +190,7 @@ def generate_presigned_post(
     Returns:
         Dictionary containing presigned POST URL and fields
     """
-    s3_client = boto3.client("s3")
+    s3_client = boto3.client("s3", config=Config(s3={"use_accelerate_endpoint": True}))
 
     # Set content type based on file extension
     content_type = get_content_type(file_name)

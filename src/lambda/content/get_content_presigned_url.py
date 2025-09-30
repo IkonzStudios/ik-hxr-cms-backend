@@ -3,6 +3,7 @@ import os
 import boto3
 from typing import Dict, Any
 from botocore.exceptions import ClientError
+from botocore.config import Config
 
 from utils.helpers import (
     get_cors_headers,
@@ -90,7 +91,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"User {user_info['user_id']} ({user_info['role']}) requesting presigned URL for org {organization_id}")
 
         # Generate presigned URL for viewing (GET operation)
-        s3_client = boto3.client("s3")
+        s3_client = boto3.client("s3", config=Config(s3={"use_accelerate_endpoint": True}))
         
         try:
             presigned_url = s3_client.generate_presigned_url(

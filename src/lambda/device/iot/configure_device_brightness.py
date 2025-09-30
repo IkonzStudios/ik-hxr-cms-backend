@@ -32,7 +32,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # Get environment variables
         devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_api_url = os.environ.get("IOT_API_URL", IOT_API_URL + "/config")
+        iot_api_url = os.environ.get("IOT_API_URL")
         
         if not devices_table_name:
             return create_error_response(500, DEVICE_ERROR_MESSAGES["MISSING_ENVIRONMENT_VAR"])
