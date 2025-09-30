@@ -40,7 +40,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             return rbac_error
 
         # Get organization ID from path parameters
-        org_id = event.get("pathParameters", {}).get("org_id")
+        org_id = event.get("pathParameters", {}).get("orgId")
         if not org_id:
             return create_error_response(400, "Organization ID is required")
 

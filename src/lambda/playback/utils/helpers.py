@@ -2,8 +2,30 @@ import json
 import boto3
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_PLAYBACK_FIELDS, VALID_STATUS_VALUES
+
+
+def convert_decimals_to_numbers(obj):
+    """
+    Recursively convert Decimal objects to float/int for JSON serialization.
+    
+    Args:
+        obj: Object that may contain Decimal values
+        
+    Returns:
+        Object with Decimal values converted to numbers
+    """
+    if isinstance(obj, Decimal):
+        # Convert Decimal to float, preserving precision
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_decimals_to_numbers(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals_to_numbers(item) for item in obj]
+    else:
+        return obj
 
 
 def get_cors_headers() -> Dict[str, str]:
@@ -223,11 +245,14 @@ def create_success_response(playback_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Success response dictionary
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_playback_data = convert_decimals_to_numbers(playback_data)
+    
     return {
         "statusCode": 201,
         "headers": get_cors_headers(),
         "body": json.dumps(
-            {"message": "Playback created successfully", "data": playback_data}
+            {"message": "Playback created successfully", "data": converted_playback_data}
         ),
     }
 
@@ -303,15 +328,18 @@ def get_playbacks_by_org_id_from_db(
 
         playbacks = response.get("Items", [])
         for playback in playbacks:
+            print(f"Playback: {playback}")
             content_id = playback.get("content_id")
             content_data, content_error = get_content_by_id_from_db(content_id, contents_table_name)
             if content_error:
                 return None, content_error
             playback["content"] = content_data
             schedule_id = playback.get("schedule_id")
-            schedule_data, schedule_error = get_schedule_by_id_from_db(schedule_id, schedules_table_name)
-            if schedule_error:
-                return None, schedule_error
+            schedule_data = None
+            if schedule_id:
+                schedule_data, schedule_error = get_schedule_by_id_from_db(schedule_id, schedules_table_name)
+                if schedule_error:
+                    return None, schedule_error
             playback["schedule"] = schedule_data
 
         return playbacks, None
@@ -425,14 +453,17 @@ def create_playbacks_list_response(playbacks: list) -> Dict[str, Any]:
     Returns:
         Response dictionary with playbacks list
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_playbacks = convert_decimals_to_numbers(playbacks)
+    
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Playbacks retrieved successfully",
-                "data": playbacks,
-                "count": len(playbacks),
+                "data": converted_playbacks,
+                "count": len(converted_playbacks),
             }
         ),
     }
@@ -445,11 +476,14 @@ def create_playback_response(playback: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Response dictionary with playback data
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_playback = convert_decimals_to_numbers(playback)
+    
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
         "body": json.dumps(
-            {"message": "Playback retrieved successfully", "data": playback}
+            {"message": "Playback retrieved successfully", "data": converted_playback}
         ),
     }
 

@@ -230,7 +230,13 @@ def save_schedule_to_db(
         
         print(f"Devices data: {devices_data}")
         for device_data in devices_data:
-            schedules = json.loads(device_data.get("schedules", "[]"))
+            schedules_raw = device_data.get("schedules", "[]")
+            # Handle both JSON string and already parsed list
+            if isinstance(schedules_raw, str):
+                schedules = json.loads(schedules_raw)
+            else:
+                schedules = schedules_raw if schedules_raw is not None else []
+            
             schedules.append(schedule_data["id"])
             print(f"Schedules: {schedules}")
             device_table.update_item(
