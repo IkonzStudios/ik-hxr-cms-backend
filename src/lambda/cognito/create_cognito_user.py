@@ -141,7 +141,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         elif current_user_role == "admin":
             if body["role"] == "superadmin":
                 return {
-                    "statusCode": 403,
+                    "statusCode": 498,
                     "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Admin users cannot create superadmin users"}),
                 }
@@ -156,7 +156,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             body["organization_id"] = current_user_org_id
         else:
             return {
-                "statusCode": 403,
+                "statusCode": 498,
                 "headers": get_cors_headers(),
                 "body": json.dumps({"error": "Only superadmin and admin users can create users"}),
             }

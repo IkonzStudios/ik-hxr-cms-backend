@@ -139,14 +139,14 @@ def validate_schedule_times(body: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def parse_array_fields(body: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Parse stringified array fields (assigned_to, contents, playlists) from the body.
+    Parse stringified array fields (assigned_to, contents, playlists, applications) from the body.
 
     Returns:
         Dictionary with parsed array values
     """
     result = {}
 
-    for field_name in ["assigned_to", "contents", "playlists"]:
+    for field_name in ["assigned_to", "contents", "playlists", "applications"]:
         field_value = body.get(field_name)
         if isinstance(field_value, str):
             try:
@@ -187,6 +187,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "assigned_to": arrays["assigned_to"],
         "contents": arrays["contents"],
         "playlists": arrays["playlists"],
+        "applications": arrays["applications"],
         "organization_id": body["organization_id"],
         "created_at": current_time,
         "updated_at": current_time,
@@ -198,7 +199,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def save_schedule_to_db(
-    schedule_data: Dict[str, Any], table_name: str
+    schedule_data: Dict[str, Any], table_name: str, device_table_name: str
 ) -> Optional[Dict[str, Any]]:
     """
     Save schedule data to DynamoDB.
@@ -213,6 +214,42 @@ def save_schedule_to_db(
         table.put_item(
             Item=schedule_data, ConditionExpression="attribute_not_exists(id)"
         )
+        device_table = dynamodb.Table(device_table_name)
+        
+        # Use batch_get_item correctly - it's called on the DynamoDB resource, not the table
+        response = dynamodb.batch_get_item(
+            RequestItems={
+                device_table_name: {
+                    'Keys': [{"id": device_id} for device_id in schedule_data["assigned_to"]]
+                }
+            }
+        )
+        
+        # Process the response correctly
+        devices_data = response.get('Responses', {}).get(device_table_name, [])
+        
+        print(f"Devices data: {devices_data}")
+        for device_data in devices_data:
+            schedules_raw = device_data.get("schedules", "[]")
+            # Handle both JSON string and already parsed list
+            if isinstance(schedules_raw, str):
+                schedules = json.loads(schedules_raw)
+            else:
+                schedules = schedules_raw if schedules_raw is not None else []
+            
+            schedules.append(schedule_data["id"])
+            print(f"Schedules: {schedules}")
+            device_table.update_item(
+                Key={"id": device_data["id"]},
+                UpdateExpression="SET schedules = :schedules",
+                ExpressionAttributeValues={":schedules": schedules}
+            )
+        
+        # Check for unprocessed keys (devices that weren't found)
+        unprocessed_keys = response.get('UnprocessedKeys', {})
+        if unprocessed_keys:
+            print(f"Some devices were not found: {unprocessed_keys}")
+        
         return None
 
     except Exception as e:
@@ -403,6 +440,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "assigned_to",
         "contents",
         "playlists",
+        "applications",
         "updated_by",
         "is_deleted",
     ]
@@ -411,7 +449,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
 
     for field in allowed_fields:
         if field in body:
-            if field in ["assigned_to", "contents", "playlists"]:
+            if field in ["assigned_to", "contents", "playlists", "applications"]:
                 # Handle array fields
                 arrays = parse_array_fields({field: body[field]})
                 update_data[field] = arrays[field]
@@ -545,6 +583,31 @@ def extract_s3_info_from_url(url: str, default_bucket: str) -> Tuple[str, str]:
     return default_bucket, url
 
 
+def get_application_by_id(application_id: str, applications_table_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """
+    Get application by ID from DynamoDB.
+    
+    Returns:
+        Tuple of (application_data, error_message)
+        If successful: (application_dict, None)
+        If error: (None, error_message)
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(applications_table_name)
+
+        response = table.get_item(Key={"id": application_id})
+
+        if "Item" not in response:
+            return None, f"Application with ID {application_id} not found"
+
+        return response["Item"], None
+
+    except Exception as e:
+        print(f"Error getting application {application_id}: {str(e)}")
+        return None, f"Error retrieving application {application_id}: {str(e)}"
+
+
 def collect_contents_from_playlists_and_contents(
     playlists: List[str], 
     contents: List[str], 
@@ -602,7 +665,9 @@ def collect_contents_from_playlists_and_contents(
                 s3_bucket, s3_key = extract_s3_info_from_url(content_url, default_s3_bucket)
                 content_list.append({
                     "s3Bucket": s3_bucket,
-                    "s3Key": s3_key
+                    "s3Key": s3_key,
+                    "id": content_id,
+                    "duration": content_data.get("duration", "0"),
                 })
                 processed_content_ids.add(content_id)
     
@@ -622,8 +687,81 @@ def collect_contents_from_playlists_and_contents(
             s3_bucket, s3_key = extract_s3_info_from_url(content_url, default_s3_bucket)
             content_list.append({
                 "s3Bucket": s3_bucket,
-                "s3Key": s3_key
+                "s3Key": s3_key,
+                "id": content_id,
+                "duration": content_data.get("duration", "0"),
             })
             processed_content_ids.add(content_id)
     
     return content_list, error_messages
+
+
+def calculate_times_played(contents, time_difference, count_started=True):
+    """
+    Calculate how many times each content in the playlist is played 
+    within a given time interval.
+    
+    Args:
+        contents (list[int]): List of durations (seconds) of each content.
+        time_difference (int): Total time interval in seconds.
+        count_started (bool): 
+            - True  => count if content starts within the interval
+            - False => count only if content finishes within the interval
+
+    Returns:
+        list[int]: Number of times each content is played.
+    """
+    n = len(contents)
+    result = [0] * n
+
+    total_duration = sum(contents)
+    full_loops = time_difference // total_duration
+    remaining_time = time_difference % total_duration
+
+    # Each content is played full_loops times
+    for i in range(n):
+        result[i] += full_loops
+
+    # Handle remaining time
+    for i in range(n):
+        if count_started:
+            if remaining_time > 0:   # started play counts
+                result[i] += 1
+                remaining_time -= contents[i]
+            else:
+                break
+        else:
+            if remaining_time >= contents[i]:  # full play fits
+                result[i] += 1
+                remaining_time -= contents[i]
+            else:
+                break
+
+    return result
+
+
+def save_playback_data(playback_data: Dict[str, Any], table_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Save playback data to DynamoDB.
+
+    Returns:
+        None if successful, error response dict if failed
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        table.put_item(
+            Item=playback_data, ConditionExpression="attribute_not_exists(id)"
+        )
+        return None
+
+    except Exception as e:
+        print(f"Error creating playback: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Error message: {str(e)}")
+        return {
+            "statusCode": 409,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Playback with this ID already exists"}),
+        }

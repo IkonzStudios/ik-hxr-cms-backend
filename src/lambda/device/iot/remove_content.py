@@ -1,5 +1,5 @@
 """
-IoT content assignment utilities for device management.
+IoT content removal utilities for device management.
 """
 
 import json
@@ -11,7 +11,8 @@ import traceback
 from typing import Dict, Any, List, Tuple, Optional
 import boto3
 
-def assign_content_to_device_utility(
+
+def remove_content_from_device_utility(
     device_id: str, 
     content_ids: List[str], 
     contents_table_name: str,
@@ -19,11 +20,11 @@ def assign_content_to_device_utility(
     devices_table_name: str = None
 ) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
     """
-    Utility function to assign content to a device by calling external IoT API.
-    This function looks up content details from DynamoDB and calls the assign content API.
+    Utility function to remove content from a device by calling external IoT API.
+    This function looks up content details from DynamoDB and calls the delete content API.
     
     Args:
-        device_id: The device ID to assign content to
+        device_id: The device ID to remove content from
         content_ids: List of content IDs from the CMS database
         contents_table_name: DynamoDB table name for contents
         content_bucket_name: S3 bucket name for content storage
@@ -36,7 +37,7 @@ def assign_content_to_device_utility(
         # Get environment variables
         if not devices_table_name:
             devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_assign_api_url = os.environ.get("IOT_ASSIGN_API_URL")
+        iot_delete_api_url = os.environ.get("IOT_DELETE_CONTENT_API_URL")
         
         if not devices_table_name:
             return False, "DEVICES_TABLE_NAME environment variable not set", None
@@ -81,10 +82,10 @@ def assign_content_to_device_utility(
                 continue
 
         if not content_list:
-            return False, "No valid content files found for assignment", None
+            return False, "No valid content files found for removal", None
 
-        # Generate unique assignment ID
-        assignment_id = int(time.time() * 1000);
+        # Generate unique deletion ID
+        deletion_id = f"cl-{int(time.time() * 1000)}"
 
         # Transform contents to match IoT API format
         iot_contents = []
@@ -96,20 +97,20 @@ def assign_content_to_device_utility(
 
         # Prepare payload for external IoT API
         iot_payload = {
-            "action": "assign_content",
+            "action": "delete_content",
             "thingName": device_id,
             "payload": {
-                "assignmentId": assignment_id,
+                "deletionId": deletion_id,
                 "contents": iot_contents
             }
         }
 
-        print(f"Assigning content to device {device_id}")
+        print(f"Removing content from device {device_id}")
         print(f"IoT API Payload: {json.dumps(iot_payload, indent=2)}")
 
         # Call external IoT API
         response = requests.post(
-            iot_assign_api_url,
+            iot_delete_api_url,
             json=iot_payload,
             headers={"Content-Type": "application/json"},
             timeout=30
@@ -130,7 +131,7 @@ def assign_content_to_device_utility(
         print(error_msg)
         return False, error_msg, None
     except Exception as e:
-        error_msg = f"Error assigning content to device: {str(e)}"
+        error_msg = f"Error removing content from device: {str(e)}"
         print(error_msg)
         print(f"Traceback: {traceback.format_exc()}")
         return False, error_msg, None

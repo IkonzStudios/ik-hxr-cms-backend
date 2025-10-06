@@ -1,10 +1,9 @@
 import json
 import os
 import boto3
-import base64
 import uuid
-from typing import Dict, Any
-from datetime import datetime, timedelta
+from typing import Dict, Any, Tuple, Optional
+from datetime import datetime
 from botocore.exceptions import ClientError
 from botocore.config import Config
 from utils.rbac import check_upload_permission_with_org
@@ -28,12 +27,15 @@ def get_cors_headers() -> Dict[str, str]:
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Lambda function to generate presigned URLs for content uploads.
+    Lambda function to generate presigned URLs for base video uploads to devices.
 
     Expected event structure:
     {
+        "pathParameters": {
+            "device_id": "device-123"
+        },
         "body": {
-            "file_name": "bunny bun.mp4"
+            "file_name": "base_video.mp4"
         },
         "requestContext": {
             "authorizer": {
@@ -54,10 +56,18 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not bucket_name:
             raise ValueError("CONTENT_BUCKET_NAME environment variable not set")
 
+        # Extract device ID from path parameters
+        device_id = event.get("pathParameters", {}).get("id")
+        if not device_id:
+            return {
+                "statusCode": 400,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "Device ID is required in path parameters"}),
+            }
+
         # Parse request body
         body = json.loads(event.get("body", "{}"))
         file_name = body.get("file_name")
-        organization_id = body.get("organization_id")
 
         if not file_name:
             return {
@@ -66,20 +76,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "body": json.dumps({"error": "file_name is required"}),
             }
 
+        # Get device information to extract organization_id
+        device_info, device_error = get_device_by_id(device_id)
+        if device_error:
+            return device_error
+
+        organization_id = device_info.get("organization_id")
         if not organization_id:
             return {
                 "statusCode": 400,
                 "headers": get_cors_headers(),
-                "body": json.dumps({"error": "organization_id not found in token"}),
+                "body": json.dumps({"error": "Device organization not found"}),
             }
 
-        # RBAC: Check if user has permission to upload content in this organization
-        rbac_error, user_info = check_upload_permission_with_org(event, "content", organization_id)
+        # RBAC: Check if user has permission to upload base video for devices in this organization
+        rbac_error, user_info = check_upload_permission_with_org(event, "device", organization_id)
         if rbac_error:
             return rbac_error
 
         # Log user action for audit
-        print(f"User {user_info['user_id']} ({user_info['role']}) uploading content to org {organization_id}")
+        print(f"User {user_info['user_id']} ({user_info['role']}) uploading base video for device {device_id} in org {organization_id}")
 
         # Validate file name
         if not is_valid_filename(file_name):
@@ -98,21 +114,21 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         file_extension = get_file_extension(file_name)
         uuid_filename = f"{file_uuid}.{file_extension}" if file_extension else file_uuid
 
-        # Create S3 key with organization structure and UUID filename
-        s3_key = f"contents/{organization_id}/{uuid_filename}"
+        # Create S3 key with base-contents structure and UUID filename
+        s3_key = f"base-contents/{organization_id}/{uuid_filename}"
 
         # Generate presigned POST instead of PUT
         presigned_post = generate_presigned_post(bucket_name, s3_key, file_name)
 
         # Create file_url in the required format
-        file_id = f"contents/{organization_id}/{uuid_filename}"
+        file_id = f"base-contents/{organization_id}/{uuid_filename}"
 
         return {
             "statusCode": 200,
             "headers": get_cors_headers(),
             "body": json.dumps(
                 {
-                    "message": "Presigned POST generated successfully",
+                    "message": "Presigned POST generated successfully for base video upload",
                     "data": {
                         "upload_url": presigned_post["url"],
                         "fields": presigned_post["fields"],
@@ -120,6 +136,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         "file_url": file_id,
                         "bucket_name": bucket_name,
                         "original_file_name": file_name,
+                        "device_id": device_id,
                         "organization_id": organization_id,
                         "expires_in": 3600,  # 1 hour
                     },
@@ -136,6 +153,50 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error generating presigned POST: {str(e)}")
         return {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
+
+
+def get_device_by_id(device_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    Get device by ID from DynamoDB.
+
+    Args:
+        device_id: The device ID to fetch
+
+    Returns:
+        Tuple of (device_data, error_response)
+        If successful: (device_dict, None)
+        If error: (None, error_response_dict)
+    """
+    try:
+        table_name = os.environ.get("DEVICES_TABLE_NAME")
+        if not table_name:
+            return None, {
+                "statusCode": 500,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "DEVICES_TABLE_NAME environment variable not set"}),
+            }
+
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        response = table.get_item(Key={"id": device_id})
+
+        if "Item" not in response:
+            return None, {
+                "statusCode": 404,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "Device not found"}),
+            }
+
+        return response["Item"], None
+
+    except Exception as e:
+        print(f"Error getting device: {str(e)}")
+        return None, {
             "statusCode": 500,
             "headers": get_cors_headers(),
             "body": json.dumps({"error": "Internal server error"}),

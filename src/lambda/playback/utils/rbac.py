@@ -2,26 +2,25 @@ import json
 from typing import Dict, Any, Optional
 
 
-# RBAC Permission Matrix for Organization resources
+# RBAC Permission Matrix for Playback resources
 PERMISSIONS = {
     "superadmin": {
-        "organization": ["create", "edit", "delete", "view"]
+        "playback": ["view"]
     },
-    "admin": {  # ORG ADMIN - can manage within their organization (but not create new orgs)
-        # Note: Admin can view/edit their own org but can't create/delete organizations
-        "organization": ["edit", "view"]
+    "admin": {
+        # No playback permissions
     },
     "content_admin": {
-        # No organization permissions
+        # No playback permissions
     },
     "analytics_user": {
-        # No organization permissions
+        # No playback permissions
     },
     "standard_user": {
-        # No organization permissions
+        # No playback permissions
     },
     "viewer": {
-        # No organization permissions
+        # No playback permissions
     }
 }
 

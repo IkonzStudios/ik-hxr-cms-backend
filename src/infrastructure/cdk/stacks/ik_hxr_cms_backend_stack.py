@@ -11,6 +11,7 @@ from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
 from database.dynamodb.tables.playlists import create_playlists_table
+from database.dynamodb.tables.playbacks import create_playbacks_table
 from database.dynamodb.tables.users import create_users_table
 from database.dynamodb.tables.organizations import create_organizations_table
 from database.dynamodb.tables.applications import create_applications_table
@@ -37,6 +38,8 @@ class IkHxrCmsBackendStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
 
         env_name_capitalized = env_name.capitalize() if env_name else "Dev"
 
@@ -76,6 +79,7 @@ class IkHxrCmsBackendStack(Stack):
         contents_table = create_contents_table(self, env_name)
         schedules_table = create_schedules_table(self, env_name)
         playlists_table = create_playlists_table(self, env_name)
+        playbacks_table = create_playbacks_table(self, env_name)
         users_table = create_users_table(self, env_name)
         organizations_table = create_organizations_table(self, env_name)
         applications_table = create_applications_table(self, env_name)
@@ -225,7 +229,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -239,6 +243,21 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
+        update_device_last_seen_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateDeviceLastSeenFunction",
+            function_name=f"Cms-UpdateDeviceLastSeen-{env_name_capitalized}",
+            handler="update_device_last_seen.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
             },
         )
@@ -348,8 +367,11 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
-                "IOT_SCHEDULE_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/schedule",
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "IOT_SCHEDULE_API_URL": IOT_API_URL + "/schedule",
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "DEVICES_TABLE_NAME": devices_table.table_name,
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -441,6 +463,21 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
                 "ENV": env_name,
             },
+        )
+
+        get_playbacks_by_org_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetPlaybacksByOrgFunction",
+            function_name=f"Cms-GetPlaybacksByOrg-{env_name_capitalized}",
+            handler="get_all_playbacks_by_org_id.handler",
+            code_path="src/lambda/playback",
+            environment={
+                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
         )
 
         # Create User Lambda functions
@@ -589,7 +626,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -606,7 +643,7 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
-                "IOT_ASSIGN_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/assign",
+                "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -623,6 +660,7 @@ class IkHxrCmsBackendStack(Stack):
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_content_from_device_lambda = create_lambda_function(
@@ -634,8 +672,11 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_playlist_from_device_lambda = create_lambda_function(
@@ -647,8 +688,12 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         remove_app_from_device_lambda = create_lambda_function(
@@ -662,6 +707,7 @@ class IkHxrCmsBackendStack(Stack):
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "ENV": env_name,
             },
+            layers=[common_dependencies_layer],
         )
 
         # Create Content Status Update Lambda function
@@ -687,7 +733,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -701,7 +747,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -715,7 +761,7 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/config",
+                "IOT_API_URL": IOT_API_URL + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -729,10 +775,58 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/device/iot",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
-                "IOT_COMMAND_API_URL": "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev/command",
+                "IOT_COMMAND_API_URL": IOT_API_URL + "/command",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
+        )
+
+        # Create Base Video Upload Lambda function
+        upload_base_video_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UploadBaseVideoFunction",
+            function_name=f"Cms-UploadBaseVideo-{env_name_capitalized}",
+            handler="upload_base_video.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "ENV": env_name,
+            },
+        )
+
+        # Create Update Device Base Content Lambda function
+        update_device_base_content_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateDeviceBaseContentFunction",
+            function_name=f"Cms-UpdateDeviceBaseContent-{env_name_capitalized}",
+            handler="update_device_base_content.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_UPDATE_API_URL": IOT_API_URL + "/lp-update",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        # Create Status Update Lambda function
+        update_status_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UpdateStatusFunction",
+            function_name=f"Cms-UpdateStatus-{env_name_capitalized}",
+            handler="update_status.handler",
+            code_path="src/lambda/status",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "CONTENTS_TABLE_NAME": contents_table.table_name,
+                "PLAYLISTS_TABLE_NAME": playlists_table.table_name,
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "ENV": env_name,
+            },
         )
 
         # Grant table permissions to Lambda functions
@@ -744,6 +838,16 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_lambda, contents_table, "read")
         grant_table_permissions(get_devices_by_org_lambda, devices_table, "read")
+        grant_table_permissions(update_device_last_seen_lambda, devices_table, "read_write")
+        grant_table_permissions(update_device_last_seen_lambda, contents_table, "read")
+        grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
+        grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
+        grant_table_permissions(upload_base_video_lambda, devices_table, "read")
+        
+        # Grant S3 permissions to upload base video Lambda
+        grant_s3_permissions(upload_base_video_lambda, content_bucket, "write")
+        
+        grant_table_permissions(update_device_base_content_lambda, devices_table, "read_write")
 
         grant_table_permissions(create_content_lambda, contents_table, "write")
         grant_table_permissions(get_content_lambda, contents_table, "read")
@@ -754,6 +858,9 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(create_schedule_lambda, schedules_table, "write")
         grant_table_permissions(create_schedule_lambda, playlists_table, "read")
         grant_table_permissions(create_schedule_lambda, contents_table, "read")
+        grant_table_permissions(create_schedule_lambda, applications_table, "read")
+        grant_table_permissions(create_schedule_lambda, playbacks_table, "write")
+        grant_table_permissions(create_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
@@ -762,6 +869,10 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_playlist_lambda, playlists_table, "read")
         grant_table_permissions(update_playlist_lambda, playlists_table, "read_write")
         grant_table_permissions(get_playlists_by_org_lambda, playlists_table, "read")
+
+        grant_table_permissions(get_playbacks_by_org_lambda, playbacks_table, "read")
+        grant_table_permissions(get_playbacks_by_org_lambda, contents_table, "read")
+        grant_table_permissions(get_playbacks_by_org_lambda, schedules_table, "read")
 
         grant_table_permissions(get_user_lambda, users_table, "read")
         grant_table_permissions(update_user_lambda, users_table, "read_write")
@@ -809,6 +920,14 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
         grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
         grant_table_permissions(generic_command_lambda, devices_table, "read")
+
+        # Grant table permissions to Status Update Lambda function
+        grant_table_permissions(update_status_lambda, devices_table, "read_write")
+        grant_table_permissions(update_status_lambda, contents_table, "read_write")
+        grant_table_permissions(update_status_lambda, playlists_table, "read_write")
+        grant_table_permissions(update_status_lambda, schedules_table, "read_write")
+        grant_table_permissions(update_status_lambda, applications_table, "read_write")
+        grant_table_permissions(update_status_lambda, playbacks_table, "read_write")
 
         # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
@@ -895,6 +1014,7 @@ class IkHxrCmsBackendStack(Stack):
         device_id_resource = device_resource.add_resource("{id}")
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
+        device_last_seen_resource = device_resource.add_resource("status")
 
         # Lambda integrations for basic device operations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
@@ -902,6 +1022,9 @@ class IkHxrCmsBackendStack(Stack):
         update_device_integration = apigateway.LambdaIntegration(update_device_lambda)
         get_devices_by_org_integration = apigateway.LambdaIntegration(
             get_devices_by_org_lambda
+        )
+        update_device_last_seen_integration = apigateway.LambdaIntegration(
+            update_device_last_seen_lambda
         )
 
         # Basic device API methods
@@ -916,6 +1039,11 @@ class IkHxrCmsBackendStack(Stack):
         )
         org_id_resource.add_method(
             "GET", get_devices_by_org_integration, authorizer=authorizer
+        )
+        
+        # Device last seen update endpoint (no auth required for device self-reporting)
+        device_last_seen_resource.add_method(
+            "POST", update_device_last_seen_integration
         )
 
         # Device Assignment API Resources and Methods
@@ -977,6 +1105,16 @@ class IkHxrCmsBackendStack(Stack):
         command_resource = device_id_resource.add_resource("command")
         command_integration = apigateway.LambdaIntegration(generic_command_lambda)
         command_resource.add_method("POST", command_integration, authorizer=authorizer)
+
+        # Base Video Upload API Resource and Method
+        upload_base_video_resource = device_id_resource.add_resource("upload-base-video")
+        upload_base_video_integration = apigateway.LambdaIntegration(upload_base_video_lambda)
+        upload_base_video_resource.add_method("POST", upload_base_video_integration, authorizer=authorizer)
+
+        # Update Device Base Content API Resource and Method
+        update_base_content_resource = device_id_resource.add_resource("base-content")
+        update_base_content_integration = apigateway.LambdaIntegration(update_device_base_content_lambda)
+        update_base_content_resource.add_method("POST", update_base_content_integration, authorizer=authorizer)
         # ------------------------------------- END OF DEVICE API -------------------------------------
 
         # ------------------------------------- CONTENT API -------------------------------------
@@ -1104,6 +1242,23 @@ class IkHxrCmsBackendStack(Stack):
         )
         # ------------------------------------- END OF PLAYLIST API -------------------------------------
 
+        # ------------------------------------- PLAYBACK API -------------------------------------
+        # API resources
+        playback_resource = api.root.add_resource("playback")
+        playback_organization_resource = playback_resource.add_resource("organization")
+        playback_org_id_resource = playback_organization_resource.add_resource(
+            "{orgId}"
+        )
+
+        # Lambda integrations
+        get_playbacks_by_org_integration = apigateway.LambdaIntegration(
+            get_playbacks_by_org_lambda
+        )
+
+        # Add playback API methods
+        playback_org_id_resource.add_method("GET", get_playbacks_by_org_integration, authorizer=authorizer)
+        # ------------------------------------- END OF PLAYBACK API -------------------------------------
+
         # ------------------------------------- USER API -------------------------------------
         # API resources
         user_resource = api.root.add_resource("user")
@@ -1201,6 +1356,20 @@ class IkHxrCmsBackendStack(Stack):
             "GET", get_applications_by_org_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF APPLICATION API -------------------------------------
+
+        # ------------------------------------- STATUS API -------------------------------------
+        # API resources
+        status_resource = api.root.add_resource("status")
+
+        # Lambda integrations
+        update_status_integration = apigateway.LambdaIntegration(update_status_lambda)
+
+        # Add status API methods
+        # TODO: Add a separate authorizer for this endpoint
+        status_resource.add_method(
+            "POST", update_status_integration
+        )
+        # ------------------------------------- END OF STATUS API -------------------------------------
 
         # Add auth endpoints (no authentication required)
         auth_resource = api.root.add_resource("auth")

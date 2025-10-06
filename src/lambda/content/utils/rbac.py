@@ -5,14 +5,16 @@ from typing import Dict, Any, Optional
 # RBAC Permission Matrix for Content resources
 PERMISSIONS = {
     "superadmin": {
-        "content": ["upload", "edit", "delete", "view"]
+        "content": ["upload", "edit", "delete", "view"],
+        "base-content": ["view"]
     },
     "admin": {  # ORG ADMIN - can manage content within their organization
-        "content": ["upload", "edit", "delete", "view"]
+        "content": ["upload", "edit", "delete", "view"],
+        "base-content": ["view"]
     },
     "content_admin": {
         # Content admin can only approve/reject, but for content operations they need no direct permissions
-        # Approval functionality would be handled separately
+        "content": ["edit", "view"],
     },
     "analytics_user": {
         # No content permissions
@@ -132,16 +134,16 @@ def check_organization_access(user_org_id: str, resource_org_id: str, user_role:
 
 def create_forbidden_response(message: str = "You don't have necessary permission to access this resource") -> Dict[str, Any]:
     """
-    Create a 403 Forbidden response.
+    Create a 498 Forbidden response.
     
     Args:
         message: The error message to include in the response
         
     Returns:
-        403 error response dictionary
+        498 error response dictionary
     """
     return {
-        "statusCode": 403,
+        "statusCode": 498,
         "headers": get_cors_headers(),
         "body": json.dumps({"error": message})
     }

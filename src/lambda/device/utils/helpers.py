@@ -166,9 +166,13 @@ def create_device_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "contents_initiated": [],
         "contents_downloading": [],
         "contents_downloaded": [],
+        "contents_failed": [],
+        "base_content": "",
         "status": body.get("status", "active"),
         "is_deleted": body.get("is_deleted", False),
         "last_seen": current_time,
+        "cpu_usage": 0,
+        "memory_usage": 0,
         "last_updated": current_time,
         "storage_left": storage["storage_left"],
         "storage_consumed": storage["storage_consumed"],
@@ -221,6 +225,13 @@ def format_response_device(device_data: Dict[str, Any]) -> Dict[str, Any]:
         response_device["storage_left"] = float(response_device["storage_left"])
     if response_device.get("storage_consumed") is not None:
         response_device["storage_consumed"] = float(response_device["storage_consumed"])
+    if response_device.get("cpu_usage") is not None:
+        response_device["cpu_usage"] = float(response_device["cpu_usage"])
+    if response_device.get("memory_usage") is not None:
+        response_device["memory_usage"] = float(response_device["memory_usage"])
+    
+    if response_device.get("schedules") is not None and isinstance(response_device.get("schedules"), str):
+        response_device["schedules"] = json.loads(response_device["schedules"])
 
     return response_device
 
@@ -629,7 +640,9 @@ def create_enriched_device_response(device: Dict[str, Any], iot_assignment_resul
     formatted_device = format_response_device(device)
     
     # Then enrich with related data
-    enriched_device = enrich_device_with_related_data(formatted_device)
+    # TODO: Uncomment this later
+    # enriched_device = enrich_device_with_related_data(formatted_device)
+    enriched_device = formatted_device.copy()
     
     # Prepare response body
     response_body = {"device": enriched_device}
