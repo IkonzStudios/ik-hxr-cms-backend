@@ -17,8 +17,8 @@ env_name = app.node.try_get_context("env") or "dev"
 
 environments = {
     "dev": {"stack_name": "IkHxrCmsBackendStack-Dev", "region": "us-east-2"},
-    "stage": {"stack_name": "IkHxrCmsBackendStack-Stage", "region": "us-east-2"},
-    "prod": {"stack_name": "IkHxrCmsBackendStack-Prod", "region": "us-east-2"},
+    "stage": {"stack_name": "IkHxrCmsBackendStack-Stage", "region": "ap-south-1"},
+    "prod": {"stack_name": "IkHxrCmsBackendStack-Prod", "region": "ap-south-1"},
 }
 
 env_config = environments[env_name]
@@ -31,6 +31,7 @@ IkHxrCmsBackendStack(
         account=app.node.try_get_context("account"), region=env_config["region"]
     ),
     env_name=env_name,
+    region=env_config["region"],
 )
 
 app.synth()

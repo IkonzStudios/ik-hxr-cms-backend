@@ -35,6 +35,7 @@ class IkHxrCmsBackendStack(Stack):
         scope: Construct,
         construct_id: str,
         env_name: str = None,
+        region: str = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -97,6 +98,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "AWS_REGION_AUTHORIZER": region,
                 "ENV": env_name,
             },
             layers=[auth_dependencies_layer, common_dependencies_layer],

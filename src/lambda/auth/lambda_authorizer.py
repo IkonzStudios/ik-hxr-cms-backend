@@ -32,7 +32,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Get environment variables
         user_pool_id = os.environ.get("USER_POOL_ID")
         user_pool_client_id = os.environ.get("USER_POOL_CLIENT_ID")
-        region = os.environ.get("AWS_REGION", "us-east-2")
+        region = os.environ.get("AWS_REGION_AUTHORIZER")
 
         print(f"User Pool ID: {user_pool_id}")
         print(f"Client ID: {user_pool_client_id}")
