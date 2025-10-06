@@ -190,7 +190,7 @@ def generate_presigned_post(
     Returns:
         Dictionary containing presigned POST URL and fields
     """
-    s3_client = boto3.client("s3", config=Config(s3={"use_accelerate_endpoint": True}))
+    s3_client = boto3.client("s3")
 
     # Set content type based on file extension
     content_type = get_content_type(file_name)

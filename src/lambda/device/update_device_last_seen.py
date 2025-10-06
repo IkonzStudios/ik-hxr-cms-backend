@@ -115,17 +115,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             dynamodb = boto3.resource("dynamodb")
             content_table = dynamodb.Table(contents_table_name)
+            playback_table = dynamodb.Table(playbacks_table_name)
 
             print(f"Base content id: {base_content_id}")
             if base_content_id:
                 content_data = content_table.get_item(Key={"id": base_content_id})
                 print(f"Content data: {content_data}")
-                content = content_data["Item"] if "Item" in content_data else 0
+                content = content_data.get("Item")
                 print(f"Content: {content}")
-                playback_table = dynamodb.Table(playbacks_table_name)
-                duration = str(int(content.get("duration", 1)))
-                print(f"Duration: {duration}")
-                times_played = int(base_content_running / float(duration)) if duration else 0
+                # Parse duration safely as float; content duration may be a decimal string like '28.76'
+                duration_value = 1.0
+                if content and content.get("duration"):
+                    try:
+                        duration_value = float(content.get("duration", 1))
+                    except (ValueError, TypeError):
+                        print(f"Invalid duration for content {base_content_id}: {content.get('duration')}. Defaulting to 1s.")
+                # Avoid zero/negative values
+                duration_value = max(duration_value, 1e-6)
+                base_content_seconds = max(float(base_content_running), 0.0)
+                print(f"Duration (s): {duration_value}")
+                times_played = int(base_content_seconds / duration_value)
                 print(f"Times played: {times_played}")
                 playback_table.put_item(
                     Item={
@@ -133,7 +142,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         "content_id": base_content_id,
                         "created_at": current_time,
                         "device_id": device_id,
-                        "duration": duration,
+                        "duration": str(duration_value),
                         "end_at": last_seen,
                         "job_id": "",
                         "organization_id": existing_device.get("organization_id", ""),
@@ -147,7 +156,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
             start_at = current_time
         else:
-            print("Last seen date is today")
+            print("Last seen date is today...")
+            print(f"current_time: {current_time}")
 
 
         update_error = update_device_last_seen_in_db(device_id, start_at, current_time, cpu_usage, memory_usage, table_name)

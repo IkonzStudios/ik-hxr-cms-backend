@@ -11,7 +11,7 @@ from utils.helpers import (
     create_error_response,
 )
 from utils.rbac import check_edit_permission_with_org
-from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES, IOT_API_URL
+from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
