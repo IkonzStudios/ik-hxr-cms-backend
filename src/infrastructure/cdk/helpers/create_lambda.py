@@ -13,7 +13,7 @@ def create_lambda_function(
     code_path: str,
     environment: Dict[str, str] = None,
     timeout_seconds: int = 29,
-    runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_9,
+    runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_13,
     memory_size: int = 128,
     layers: Optional[List[lambda_.ILayerVersion]] = None,
 ) -> lambda_.Function:
@@ -28,7 +28,7 @@ def create_lambda_function(
         code_path: Path to the Lambda code (e.g., "src/lambda/notes")
         environment: Environment variables for the Lambda
         timeout_seconds: Timeout in seconds (default: 29)
-        runtime: Lambda runtime (default: Python 3.9)
+        runtime: Lambda runtime (default: Python 3.13)
         memory_size: Memory allocation in MB (default: 128)
         layers: List of Lambda layers to attach (default: None)
 

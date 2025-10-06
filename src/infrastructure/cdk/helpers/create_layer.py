@@ -28,7 +28,7 @@ def create_lambda_layer(
     """
 
     if compatible_runtimes is None:
-        compatible_runtimes = [lambda_.Runtime.PYTHON_3_9]
+        compatible_runtimes = [lambda_.Runtime.PYTHON_3_13]
 
     return lambda_.LayerVersion(
         scope,

@@ -17,7 +17,7 @@ docker run --rm \
   --entrypoint="" \
   -v $(pwd):/workspace \
   -w /workspace \
-  public.ecr.aws/lambda/python:3.9 \
+  public.ecr.aws/lambda/python:3.13 \
   pip install PyJWT==2.8.0 cryptography==41.0.7 -t src/layers/auth-dependencies/python
 
 # Build common dependencies layer using Docker with x86_64 platform
@@ -27,7 +27,7 @@ docker run --rm \
   --entrypoint="" \
   -v $(pwd):/workspace \
   -w /workspace \
-  public.ecr.aws/lambda/python:3.9 \
+  public.ecr.aws/lambda/python:3.13 \
   pip install requests==2.31.0 -t src/layers/common-dependencies/python
 
 # Create zip files
