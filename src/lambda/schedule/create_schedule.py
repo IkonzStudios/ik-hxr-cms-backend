@@ -82,6 +82,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         if_appplication_schedule = len(body.get("applications", [])) > 0
 
+        print(f"If application schedule: {if_appplication_schedule}")
+
         if if_appplication_schedule:
             print("Application schedule")
             for field in ["start_at"]:
@@ -112,6 +114,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         iot_success = False
         iot_errors = []
         iot_responses = []
+        playback_payloads_to_be_created = []
         
         if if_appplication_schedule:
             print("Application schedule")
@@ -180,7 +183,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 "body": json.dumps({
                     "message": "Schedule created and IoT devices scheduled successfully",
                     "data": response_data,
-                    "playback_payloads_to_be_created": playback_payloads_to_be_created
+                    "playback_payloads_to_be_created": playback_payloads_to_be_created if not if_appplication_schedule else None
                 }),
             }
         else:
