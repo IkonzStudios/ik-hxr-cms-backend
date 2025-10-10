@@ -17,7 +17,7 @@ PERMISSIONS = {
         # No device permissions
     },
     "standard_user": {
-        "device": ["view"]
+        "device": ["view", "edit"]
     },
     "viewer": {
         "device": ["view"]
