@@ -26,6 +26,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     print(f"Function Name: {context.function_name}")
     print(f"Request ID: {context.aws_request_id}")
     print(f"Event: {json.dumps(event, default=str)}")
+    print(f"Method ARN: {event.get('methodArn', 'NOT_FOUND')}")
     print("==================================")
 
     try:
@@ -135,7 +136,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Generated context: {json.dumps(context_data)}")
 
             # Generate allow policy with user context
-            policy = generate_policy(user_id, "Allow", event["methodArn"], context_data)
+            method_arn = event["methodArn"]
+            print(f"Using methodArn for policy: {method_arn}")
+            
+            # Convert the methodArn to use wildcard stage and template paths
+            # This matches the format shown in AWS UI: arn:aws:execute-api:region:account:api-id/*/METHOD/path/{param}
+            converted_arn = get_base_arn(method_arn)
+            print(f"Converted ARN to template format: {converted_arn}")
+            
+            policy = generate_policy(user_id, "Allow", converted_arn, context_data)
             print(f"Generated policy: {json.dumps(policy, default=str)}")
 
             return policy
@@ -161,6 +170,36 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return generate_policy("user", "Deny", event["methodArn"])
 
 
+def get_base_arn(method_arn: str) -> str:
+    """
+    Convert a method ARN with actual parameter values to a base ARN format.
+    
+    Example:
+    Input:  arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/dev/GET/playlist/organization/73ffc2ad-1551-49fa-864c-133a60e9e2ef
+    Output: arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/*/*
+    """
+    try:
+        # Split the ARN into parts
+        arn_parts = method_arn.split("/")
+        
+        if len(arn_parts) < 1:
+            print(f"Invalid method ARN format: {method_arn}")
+            return method_arn
+        
+        # Extract the base ARN (everything before the stage)
+        base_arn = arn_parts[0]  # arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5
+       
+        # Reconstruct the ARN with wildcard stage and template path
+        template_arn = f"{base_arn}/*/*"
+        
+        print(f"Converted ARN: {method_arn} -> {template_arn}")
+        return template_arn
+        
+    except Exception as e:
+        print(f"Error converting method ARN: {e}")
+        return method_arn
+
+
 def generate_policy(
     principal_id: str, effect: str, resource: str, context: Dict[str, Any] = None
 ) -> Dict[str, Any]:
@@ -174,8 +213,7 @@ def generate_policy(
                 {
                     "Action": "execute-api:Invoke",
                     "Effect": effect,
-                    # "Resource": resource,
-                    "Resource": "arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/*/*"
+                    "Resource": resource,
                 }
             ],
         },
