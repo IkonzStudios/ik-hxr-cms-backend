@@ -85,6 +85,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         original_playlists = existing_device.get("playlists", [])
         if isinstance(original_playlists, str):
             original_playlists = json.loads(original_playlists) if original_playlists else []
+        
+        original_contents_initiated = existing_device.get("contents_initiated", [])
+        if isinstance(original_contents_initiated, str):
+            original_contents_initiated = json.loads(original_contents_initiated) if original_contents_initiated else []
 
         # Trigger IoT playlist assignment via content assignment
         iot_assignment_result = None
@@ -161,6 +165,35 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             updated_playlists = list(set(current_playlists + playlist_ids))
             update_data = {"playlists": updated_playlists}
             
+            # Update contents_initiated with content IDs that are not already in any content status list
+            if all_content_ids:
+                # Get current content status lists
+                current_contents_initiated = existing_device.get("contents_initiated", [])
+                if isinstance(current_contents_initiated, str):
+                    current_contents_initiated = json.loads(current_contents_initiated) if current_contents_initiated else []
+                
+                current_contents_downloading = existing_device.get("contents_downloading", [])
+                if isinstance(current_contents_downloading, str):
+                    current_contents_downloading = json.loads(current_contents_downloading) if current_contents_downloading else []
+                
+                current_contents_downloaded = existing_device.get("contents_downloaded", [])
+                if isinstance(current_contents_downloaded, str):
+                    current_contents_downloaded = json.loads(current_contents_downloaded) if current_contents_downloaded else []
+                
+                # Combine all existing content IDs from the three status lists
+                existing_content_ids = set(current_contents_initiated + current_contents_downloading + current_contents_downloaded)
+                
+                # Find content IDs that are not in any of the status lists
+                new_content_ids = [content_id for content_id in all_content_ids if content_id not in existing_content_ids]
+                
+                # Add new content IDs to contents_initiated
+                if new_content_ids:
+                    updated_contents_initiated = current_contents_initiated.copy()
+                    for content_id in new_content_ids:
+                        if content_id not in updated_contents_initiated:
+                            updated_contents_initiated.append(content_id)
+                    update_data["contents_initiated"] = updated_contents_initiated
+            
             update_error = update_device_in_db(device_id, update_data, table_name)
             if update_error:
                 print(f"Database update failed after successful IoT assignment: {update_error}")
@@ -197,7 +230,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if database_updated:
                 try:
                     print("Rolling back database changes due to error")
-                    rollback_data = {"playlists": original_playlists}
+                    rollback_data = {
+                        "playlists": original_playlists,
+                        "contents_initiated": original_contents_initiated
+                    }
                     update_device_in_db(device_id, rollback_data, table_name)
                     print("Database rollback successful")
                 except Exception as rollback_error:
