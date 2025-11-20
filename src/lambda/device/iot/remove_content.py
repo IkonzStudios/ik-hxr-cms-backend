@@ -82,7 +82,7 @@ def remove_content_from_device_utility(
                 continue
 
         if not content_list:
-            return False, "No valid content files found for removal", None
+            return True, None, None
 
         # Generate unique deletion ID
         deletion_id = f"cl-{int(time.time() * 1000)}"
