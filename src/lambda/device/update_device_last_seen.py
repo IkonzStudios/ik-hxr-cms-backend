@@ -63,9 +63,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         body_fields = set(body.keys())
         
         # Check for unexpected fields
-        unexpected_fields = body_fields - expected_fields
-        if unexpected_fields:
-            return create_error_response(400, f"Unexpected fields in request body: {', '.join(unexpected_fields)}")
+        # unexpected_fields = body_fields - expected_fields
+        # if unexpected_fields:
+        #     return create_error_response(400, f"Unexpected fields in request body: {', '.join(unexpected_fields)}")
 
         device_id = body["device_id"]
         cpu_usage = body["cpu_usage"]
