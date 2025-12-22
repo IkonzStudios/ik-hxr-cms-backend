@@ -28,6 +28,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "logo": "https://example.com/new-logo.png",
             "version": "1.1.0",
             "platform": "ios",
+            "type": "RPM",
+            "url": "https://example.com/new-app",
             "updated_by": "user-id-123"
         }
     }

@@ -25,6 +25,8 @@ OPTIONAL_APPLICATION_FIELDS = [
     "is_deleted",
     "created_by",
     "updated_by",
+    "type",
+    "url",
 ]
 
 # Application field types for validation
@@ -36,6 +38,8 @@ APPLICATION_FIELD_TYPES = {
     "platform": str,  # Platform name (e.g., "android", "ios", "web")
     "logo": str,  # Logo URL
     "is_deleted": bool,  # Soft delete flag
+    "type": str,  # Application type (e.g., "PWA", "RPM")
+    "url": str,  # Application URL
 }
 
 # Valid platform values
@@ -55,4 +59,10 @@ VALID_STATUS = [
     "pending",
     "archived",
     "deleted",
+]
+
+# Valid application type values
+VALID_APPLICATION_TYPES = [
+    "PWA",
+    "RPM",
 ]

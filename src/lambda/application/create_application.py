@@ -27,6 +27,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "logo": "https://example.com/logo.png",
         "version": "1.0.0",
         "platform": "android",
+        "type": "PWA",
+        "url": "https://example.com/app",
         "organization_id": "123e4567-e89b-12d3-a456-426614174000",
         "created_by": "user-id-123",
         "updated_by": "user-id-123"

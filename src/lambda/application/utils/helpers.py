@@ -8,6 +8,7 @@ from .constants import (
     APPLICATION_FIELD_TYPES,
     VALID_PLATFORMS,
     VALID_STATUS,
+    VALID_APPLICATION_TYPES,
 )
 
 
@@ -111,6 +112,8 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "version": body["version"],
         "platform": body["platform"],
         "organization_id": body["organization_id"],
+        "type": body.get("type", ""),
+        "url": body.get("url", ""),
         "is_deleted": body.get("is_deleted", False),
         "created_at": current_time,
         "updated_at": current_time,
@@ -327,6 +330,8 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "platform",
         "updated_by",
         "is_deleted",
+        "type",
+        "url",
     ]
 
     update_data = {}
@@ -339,6 +344,13 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
                     update_data[field] = body[field]
                 else:
                     update_data[field] = "web"  # Default to web if invalid
+            elif field == "type":
+                # Validate type
+                if body[field] in VALID_APPLICATION_TYPES:
+                    update_data[field] = body[field]
+                else:
+                    # Don't update if invalid type
+                    continue
             else:
                 update_data[field] = body[field]
 
@@ -409,5 +421,9 @@ def validate_application_fields(body: Dict[str, Any]) -> Optional[str]:
     # Validate status
     if "status" in body and body["status"] not in VALID_STATUS:
         return f"Status must be one of: {', '.join(VALID_STATUS)}"
+
+    # Validate type
+    if "type" in body and body["type"] and body["type"] not in VALID_APPLICATION_TYPES:
+        return f"Type must be one of: {', '.join(VALID_APPLICATION_TYPES)}"
 
     return None

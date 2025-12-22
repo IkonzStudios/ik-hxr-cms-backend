@@ -27,7 +27,7 @@ def call_iot_application_schedule_api(
         schedule_time: Start time in ISO format
         schedule_time_end: End time in ISO format
         playback_id: Unique schedule ID (used as scheduleId)
-        applications: List of application dicts with flatpakAppId and app_type
+        applications: List of application dicts with flatpakAppId and type
         iot_api_url: IoT API endpoint URL
         
     Returns:
@@ -35,16 +35,17 @@ def call_iot_application_schedule_api(
     """
     # Transform applications to match the required payload structure
     content_payload = {
-        "flatpakAppId": applications[0]["flatpakAppId"] if applications else "",
-        "app_type": applications[0]["app_type"] if applications else "rpm"
+        "url": applications[0]["url"]
     }
-    
+
+    schedule_type = "url_" + applications[0]["type"].lower();
+
     payload = {
         "action": "schedule_content",
         "thingName": device_id,
         "payload": {
             "scheduleId": str(playback_id),  # Use playback_id as scheduleId
-            "scheduleType": "interactive",
+            "scheduleType": schedule_type,
             "scheduleStartTime": schedule_time,
             "scheduleEndTime": schedule_time_end,
             "contentPayload": content_payload
@@ -173,7 +174,7 @@ def collect_applications_from_ids(
         
     Returns:
         Tuple of (application_list, error_messages)
-        application_list: List of dicts with flatpakAppId and app_type
+        application_list: List of dicts with flatpakAppId and type
         error_messages: List of error messages encountered
     """
     application_list = []
@@ -187,14 +188,13 @@ def collect_applications_from_ids(
             continue
             
         # Extract application information for IoT scheduling
-        # For now, we'll use the application name as flatpakAppId and set app_type to "rpm"
+        # For now, we'll use the application name as flatpakAppId and set type to "PWA"
         # This can be enhanced based on actual application data structure
-        flatpak_app_id = f"/opt/{application_data.get('name', 'unknown')}/{application_data.get('name', 'unknown').lower().replace(' ', '-')}"
-        app_type = "rpm"  # Default app type
+        # flatpak_app_id = f"/opt/{application_data.get('name', 'unknown')}/{application_data.get('name', 'unknown').lower().replace(' ', '-')}"
         
         application_list.append({
-            "flatpakAppId": flatpak_app_id,
-            "app_type": app_type
+            "type": application_data.get("type", "PWA"),
+            "url": application_data.get("url", "")
         })
     
     return application_list, error_messages
