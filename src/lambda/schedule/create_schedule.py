@@ -106,11 +106,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Create schedule data
         schedule_data = create_schedule_data(body)
 
-        # Save to database
-        save_error = save_schedule_to_db(schedule_data, schedules_table_name, device_table_name)
-        if save_error:
-            return save_error
-
         iot_success = False
         iot_errors = []
         iot_responses = []
@@ -134,8 +129,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 iot_api_url=iot_schedule_api_url,
                 default_s3_bucket=default_s3_bucket
             )
-
-
         
         # Create enhanced response with IoT scheduling results
         response_data = {
@@ -148,7 +141,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
         
         if iot_success:
+            job_id = iot_responses[0]["response"]["jobId"] if iot_responses else ""
+            schedule_data["job_id"] = job_id
+            # Save to database
+            save_error = save_schedule_to_db(schedule_data, schedules_table_name, device_table_name)
+            if save_error:
+                return save_error
+
             if if_appplication_schedule:
+                # TODO:
                 print("Application schedule")
             else:
                 print("Content schedule")

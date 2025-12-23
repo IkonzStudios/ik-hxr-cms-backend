@@ -26,6 +26,7 @@ OPTIONAL_SCHEDULE_FIELDS = [
     "applications",
     "created_by",
     "updated_by",
+    "job_id",
 ]
 
 # Schedule field types for validation
@@ -36,4 +37,5 @@ SCHEDULE_FIELD_TYPES = {
     "loop": bool,  # Whether to loop the schedule
     "is_active": bool,  # Whether the schedule is active
     "is_deleted": bool,  # Soft delete flag
+    "job_id": str,  # IoT job ID for the schedule
 }

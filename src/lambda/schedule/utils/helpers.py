@@ -184,6 +184,7 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "loop": body.get("loop", False),
         "is_active": body.get("is_active", True),
         "is_deleted": body.get("is_deleted", False),
+        "job_id": body.get("job_id", ""),
         "assigned_to": arrays["assigned_to"],
         "contents": arrays["contents"],
         "playlists": arrays["playlists"],
@@ -443,6 +444,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "applications",
         "updated_by",
         "is_deleted",
+        "job_id",
     ]
 
     update_data = {}
