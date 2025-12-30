@@ -125,7 +125,16 @@ def create_cognito_groups(
     user_pool: cognito.UserPool,
     env_name: str = None,
 ) -> dict:
-    """Create Cognito groups for role-based access control."""
+    """Create Cognito groups for role-based access control.
+    
+    Groups are created based on roles defined in PERMISSIONS across RBAC files:
+    - superadmin: Super administrator with full system access
+    - admin: Organization administrator
+    - content_admin: Content administrator with content approval permissions
+    - analytics_user: User with analytics access
+    - standard_user: Regular user with standard permissions
+    - viewer: Read-only user
+    """
 
     groups = {}
 
@@ -151,16 +160,38 @@ def create_cognito_groups(
     )
     groups["admin"] = admin_group
 
-    # User group
-    user_group = cognito.CfnUserPoolGroup(
+    # Content Admin group
+    content_admin_group = cognito.CfnUserPoolGroup(
         scope,
-        "UserGroup",
+        "ContentAdminGroup",
         user_pool_id=user_pool.user_pool_id,
-        group_name="user",
-        description="Regular user",
+        group_name="content_admin",
+        description="Content administrator with content approval permissions",
         precedence=3,
     )
-    groups["user"] = user_group
+    groups["content_admin"] = content_admin_group
+
+    # Analytics User group
+    analytics_user_group = cognito.CfnUserPoolGroup(
+        scope,
+        "AnalyticsUserGroup",
+        user_pool_id=user_pool.user_pool_id,
+        group_name="analytics_user",
+        description="User with analytics access",
+        precedence=4,
+    )
+    groups["analytics_user"] = analytics_user_group
+
+    # Standard User group
+    standard_user_group = cognito.CfnUserPoolGroup(
+        scope,
+        "StandardUserGroup",
+        user_pool_id=user_pool.user_pool_id,
+        group_name="standard_user",
+        description="Regular user with standard permissions",
+        precedence=5,
+    )
+    groups["standard_user"] = standard_user_group
 
     # Viewer group
     viewer_group = cognito.CfnUserPoolGroup(
@@ -169,7 +200,7 @@ def create_cognito_groups(
         user_pool_id=user_pool.user_pool_id,
         group_name="viewer",
         description="Read-only user",
-        precedence=4,
+        precedence=6,
     )
     groups["viewer"] = viewer_group
 
