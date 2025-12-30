@@ -63,13 +63,28 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         body_fields = set(body.keys())
         
         # Check for unexpected fields
-        unexpected_fields = body_fields - expected_fields
-        if unexpected_fields:
-            return create_error_response(400, f"Unexpected fields in request body: {', '.join(unexpected_fields)}")
+        # unexpected_fields = body_fields - expected_fields
+        # if unexpected_fields:
+        #     return create_error_response(400, f"Unexpected fields in request body: {', '.join(unexpected_fields)}")
 
         device_id = body["device_id"]
         cpu_usage = body["cpu_usage"]
         memory_usage = body["memory_usage"]
+
+        # Validate cpu_usage and memory_usage
+        try:
+            # Handle empty strings by converting to 0.0
+            if cpu_usage == "" or cpu_usage is None:
+                cpu_usage = 0.0
+            else:
+                cpu_usage = float(cpu_usage)
+            
+            if memory_usage == "" or memory_usage is None:
+                memory_usage = 0.0
+            else:
+                memory_usage = float(memory_usage)
+        except (ValueError, TypeError):
+            return create_error_response(400, "cpu_usage and memory_usage must be valid numbers")
 
         # First get the existing device to verify it exists
         existing_device, get_error = get_device_by_id_from_db(device_id, table_name)

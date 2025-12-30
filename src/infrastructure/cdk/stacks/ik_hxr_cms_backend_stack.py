@@ -2,6 +2,8 @@ from aws_cdk import (
     Stack,
     aws_apigateway as apigateway,
     aws_cognito as cognito,
+    aws_sqs as sqs,
+    aws_lambda_event_sources as lambda_event_sources,
     RemovalPolicy,
     aws_iam as iam,
     Duration,
@@ -16,7 +18,7 @@ from database.dynamodb.tables.users import create_users_table
 from database.dynamodb.tables.organizations import create_organizations_table
 from database.dynamodb.tables.applications import create_applications_table
 from helpers.create_lambda import create_lambda_function
-from helpers.grant_permission import grant_table_permissions
+from helpers.grant_permission import grant_table_permissions, grant_sqs_permissions
 from helpers.api_policies import create_ip_restriction_policy
 from helpers.create_cognito import (
     create_cognito_user_pool,
@@ -35,6 +37,7 @@ class IkHxrCmsBackendStack(Stack):
         scope: Construct,
         construct_id: str,
         env_name: str = None,
+        region: str = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -84,6 +87,28 @@ class IkHxrCmsBackendStack(Stack):
         organizations_table = create_organizations_table(self, env_name)
         applications_table = create_applications_table(self, env_name)
 
+        # Create SQS FIFO queue for status update processing (per-device ordering)
+        status_update_queue = sqs.Queue(
+            self,
+            "StatusUpdateQueue",
+            queue_name=f"cms-status-update-queue-{env_name}.fifo",
+            fifo=True,
+            content_based_deduplication=True,
+            visibility_timeout=Duration.seconds(300),  # 5 minutes to match Lambda timeout
+            retention_period=Duration.days(14),  # Keep messages for 14 days
+            receive_message_wait_time=Duration.seconds(20),  # Long polling
+            dead_letter_queue=sqs.DeadLetterQueue(
+                max_receive_count=3,
+                queue=sqs.Queue(
+                    self,
+                    "StatusUpdateDLQ",
+                    queue_name=f"cms-status-update-dlq-{env_name}.fifo",
+                    fifo=True,
+                    retention_period=Duration.days(14),
+                )
+            )
+        )
+
         # Create S3 bucket for content storage
         content_bucket = create_content_bucket(self, env_name)
 
@@ -97,6 +122,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "USER_POOL_ID": user_pool.user_pool_id,
                 "USER_POOL_CLIENT_ID": user_pool_client.user_pool_client_id,
+                "AWS_REGION_AUTHORIZER": region,
                 "ENV": env_name,
             },
             layers=[auth_dependencies_layer, common_dependencies_layer],
@@ -398,6 +424,21 @@ class IkHxrCmsBackendStack(Stack):
             code_path="src/lambda/schedule",
             environment={
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
+        delete_schedule_lambda = create_lambda_function(
+            scope=self,
+            construct_id="DeleteScheduleByIdFunction",
+            function_name=f"Cms-DeleteScheduleById-{env_name_capitalized}",
+            handler="delete_schedule_by_id.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_DELETE_API_URL": IOT_API_URL + "/sch-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -811,12 +852,25 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],
         )
 
-        # Create Status Update Lambda function
+        # Create Status Update Lambda function (now just queues messages)
         update_status_lambda = create_lambda_function(
             scope=self,
             construct_id="UpdateStatusFunction",
             function_name=f"Cms-UpdateStatus-{env_name_capitalized}",
             handler="update_status.handler",
+            code_path="src/lambda/status",
+            environment={
+                "STATUS_UPDATE_QUEUE_URL": status_update_queue.queue_url,
+                "ENV": env_name,
+            },
+        )
+
+        # Create Status Update Queue Processor Lambda function
+        status_update_processor_lambda = create_lambda_function(
+            scope=self,
+            construct_id="StatusUpdateProcessorFunction",
+            function_name=f"Cms-StatusUpdateProcessor-{env_name_capitalized}",
+            handler="status_update_processor.handler",
             code_path="src/lambda/status",
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
@@ -825,8 +879,10 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "STATUS_UPDATE_QUEUE_URL": status_update_queue.queue_url,
                 "ENV": env_name,
             },
+            timeout_seconds=300,  # 5 minutes to match queue visibility timeout
         )
 
         # Grant table permissions to Lambda functions
@@ -863,6 +919,8 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(create_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
+        grant_table_permissions(delete_schedule_lambda, schedules_table, "read_write")
+        grant_table_permissions(delete_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
 
         grant_table_permissions(create_playlist_lambda, playlists_table, "write")
@@ -921,13 +979,28 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
         grant_table_permissions(generic_command_lambda, devices_table, "read")
 
-        # Grant table permissions to Status Update Lambda function
-        grant_table_permissions(update_status_lambda, devices_table, "read_write")
-        grant_table_permissions(update_status_lambda, contents_table, "read_write")
-        grant_table_permissions(update_status_lambda, playlists_table, "read_write")
-        grant_table_permissions(update_status_lambda, schedules_table, "read_write")
-        grant_table_permissions(update_status_lambda, applications_table, "read_write")
-        grant_table_permissions(update_status_lambda, playbacks_table, "read_write")
+        # Grant SQS permissions to Status Update Lambda function (for sending messages)
+        grant_sqs_permissions(update_status_lambda, status_update_queue, "send")
+
+        # Grant table permissions to Status Update Processor Lambda function
+        grant_table_permissions(status_update_processor_lambda, devices_table, "read_write")
+        grant_table_permissions(status_update_processor_lambda, contents_table, "read_write")
+        grant_table_permissions(status_update_processor_lambda, playlists_table, "read_write")
+        grant_table_permissions(status_update_processor_lambda, schedules_table, "read_write")
+        grant_table_permissions(status_update_processor_lambda, applications_table, "read_write")
+        grant_table_permissions(status_update_processor_lambda, playbacks_table, "read_write")
+
+        # Grant SQS permissions to Status Update Processor Lambda function (for receiving messages)
+        grant_sqs_permissions(status_update_processor_lambda, status_update_queue, "consume")
+
+        # Add SQS event source to trigger the processor Lambda (batch_size=1 -> sequential)
+        status_update_processor_lambda.add_event_source(
+            lambda_event_sources.SqsEventSource(
+                status_update_queue,
+                batch_size=1,
+                report_batch_item_failures=True,
+            )
+        )
 
         # Create Cognito Lambda functions
         create_cognito_user_lambda = create_lambda_function(
@@ -1187,6 +1260,9 @@ class IkHxrCmsBackendStack(Stack):
         update_schedule_integration = apigateway.LambdaIntegration(
             update_schedule_lambda
         )
+        delete_schedule_integration = apigateway.LambdaIntegration(
+            delete_schedule_lambda
+        )
         get_schedules_by_org_integration = apigateway.LambdaIntegration(
             get_schedules_by_org_lambda
         )
@@ -1200,6 +1276,9 @@ class IkHxrCmsBackendStack(Stack):
         )
         schedule_id_resource.add_method(
             "PUT", update_schedule_integration, authorizer=authorizer
+        )
+        schedule_id_resource.add_method(
+            "DELETE", delete_schedule_integration, authorizer=authorizer
         )
         schedule_org_id_resource.add_method(
             "GET", get_schedules_by_org_integration, authorizer=authorizer

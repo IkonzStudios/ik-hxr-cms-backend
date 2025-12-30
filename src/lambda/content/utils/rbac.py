@@ -15,15 +15,18 @@ PERMISSIONS = {
     "content_admin": {
         # Content admin can only approve/reject, but for content operations they need no direct permissions
         "content": ["edit", "view"],
+        "base-content": ["view"]
     },
     "analytics_user": {
         # No content permissions
     },
     "standard_user": {
-        "content": ["upload", "edit", "delete", "view"]
+        "content": ["upload", "edit", "delete", "view"],
+        "base-content": ["view"]
     },
     "viewer": {
-        "content": ["view"]
+        "content": ["view"],
+        "base-content": ["view"]
     }
 }
 

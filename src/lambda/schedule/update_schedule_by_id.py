@@ -32,6 +32,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "contents": "[\"content-id-3\", \"content-id-4\"]",
             "playlists": "[\"playlist-id-2\"]",
             "applications": "[\"application-id-1\", \"application-id-2\"]",
+            "job_id": "job-id-123",
             "updated_by": "user-id-456"
         }
     }
