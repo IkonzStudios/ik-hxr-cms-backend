@@ -937,7 +937,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_users_by_org_lambda, users_table, "read")
 
         grant_table_permissions(
-            create_organization_lambda, organizations_table, "write"
+            create_organization_lambda, organizations_table, "read_write"
         )
         grant_table_permissions(get_organization_lambda, organizations_table, "read")
         grant_table_permissions(
