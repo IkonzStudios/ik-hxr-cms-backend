@@ -429,6 +429,21 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],
         )
 
+        delete_schedule_lambda = create_lambda_function(
+            scope=self,
+            construct_id="DeleteScheduleByIdFunction",
+            function_name=f"Cms-DeleteScheduleById-{env_name_capitalized}",
+            handler="delete_schedule_by_id.handler",
+            code_path="src/lambda/schedule",
+            environment={
+                "SCHEDULES_TABLE_NAME": schedules_table.table_name,
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "IOT_DELETE_API_URL": IOT_API_URL + "/sch-delete",
+                "ENV": env_name,
+            },
+            layers=[common_dependencies_layer],
+        )
+
         get_schedules_by_org_lambda = create_lambda_function(
             scope=self,
             construct_id="GetSchedulesByOrgFunction",
@@ -904,6 +919,8 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(create_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedule_lambda, schedules_table, "read")
         grant_table_permissions(update_schedule_lambda, schedules_table, "read_write")
+        grant_table_permissions(delete_schedule_lambda, schedules_table, "read_write")
+        grant_table_permissions(delete_schedule_lambda, devices_table, "read_write")
         grant_table_permissions(get_schedules_by_org_lambda, schedules_table, "read")
 
         grant_table_permissions(create_playlist_lambda, playlists_table, "write")
@@ -1243,6 +1260,9 @@ class IkHxrCmsBackendStack(Stack):
         update_schedule_integration = apigateway.LambdaIntegration(
             update_schedule_lambda
         )
+        delete_schedule_integration = apigateway.LambdaIntegration(
+            delete_schedule_lambda
+        )
         get_schedules_by_org_integration = apigateway.LambdaIntegration(
             get_schedules_by_org_lambda
         )
@@ -1256,6 +1276,9 @@ class IkHxrCmsBackendStack(Stack):
         )
         schedule_id_resource.add_method(
             "PUT", update_schedule_integration, authorizer=authorizer
+        )
+        schedule_id_resource.add_method(
+            "DELETE", delete_schedule_integration, authorizer=authorizer
         )
         schedule_org_id_resource.add_method(
             "GET", get_schedules_by_org_integration, authorizer=authorizer

@@ -767,3 +767,83 @@ def save_playback_data(playback_data: Dict[str, Any], table_name: str) -> Option
             "headers": get_cors_headers(),
             "body": json.dumps({"error": "Playback with this ID already exists"}),
         }
+
+
+def delete_schedule_from_db(
+    schedule_id: str, table_name: str, device_table_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Delete schedule from DynamoDB and remove schedule ID from associated devices.
+
+    Returns:
+        None if successful, error response dict if failed
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        device_table = dynamodb.Table(device_table_name)
+
+        # First, get the schedule to get assigned devices
+        response = table.get_item(Key={"id": schedule_id})
+        if "Item" not in response:
+            return {
+                "statusCode": 404,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "Schedule not found"}),
+            }
+
+        schedule_data = response["Item"]
+        assigned_devices = schedule_data.get("assigned_to", [])
+
+        # Remove schedule ID from all assigned devices
+        if assigned_devices:
+            device_response = dynamodb.batch_get_item(
+                RequestItems={
+                    device_table_name: {
+                        'Keys': [{"id": device_id} for device_id in assigned_devices]
+                    }
+                }
+            )
+            
+            devices_data = device_response.get('Responses', {}).get(device_table_name, [])
+            
+            for device_data in devices_data:
+                schedules_raw = device_data.get("schedules", "[]")
+                # Handle both JSON string and already parsed list
+                if isinstance(schedules_raw, str):
+                    schedules = json.loads(schedules_raw)
+                else:
+                    schedules = schedules_raw if schedules_raw is not None else []
+                
+                # Remove the schedule ID from the list
+                if schedule_id in schedules:
+                    schedules.remove(schedule_id)
+                    
+                device_table.update_item(
+                    Key={"id": device_data["id"]},
+                    UpdateExpression="SET schedules = :schedules",
+                    ExpressionAttributeValues={":schedules": schedules}
+                )
+
+        # Delete the schedule
+        table.delete_item(
+            Key={"id": schedule_id},
+            ConditionExpression="attribute_exists(id)"
+        )
+
+        return None
+
+    except Exception as e:
+        print(f"Error deleting schedule: {str(e)}")
+        print(f"Error type: {type(e)}")
+        if "ConditionalCheckFailedException" in str(e):
+            return {
+                "statusCode": 404,
+                "headers": get_cors_headers(),
+                "body": json.dumps({"error": "Schedule not found"}),
+            }
+        return {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
