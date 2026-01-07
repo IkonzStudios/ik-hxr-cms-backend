@@ -30,6 +30,8 @@ REQUIRED_USER_FIELDS = [
 VALID_USER_ROLES = [
     "superadmin",
     "admin",
-    "user",
+    "content_admin",
+    "analytics_user",
+    "standard_user",
     "viewer",
 ]

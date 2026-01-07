@@ -354,9 +354,8 @@ def update_user_in_db(
 
         # If email is being updated, check for uniqueness
         if "email" in update_data:
-            email_response = table.query(
-                IndexName="email-index",
-                KeyConditionExpression="email = :email",
+            email_response = table.scan(
+                FilterExpression="email = :email",
                 ExpressionAttributeValues={":email": update_data["email"].lower()},
             )
 
