@@ -159,6 +159,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     playback_response = next((x for x in device_response if x["device_id"] == playback_payload["device_id"]), None)
                     playback_payload["id"] = str(uuid.uuid4())
                     playback_payload["schedule_id"] = schedule_data["id"]
+                    playback_payload["playback_id"] = schedule_data["playback_id"]
                     playback_payload["job_id"] = playback_response["response"]["jobId"]
                     playback_payload["organization_id"] = schedule_data["organization_id"]
                     playback_payload["created_at"] = current_time

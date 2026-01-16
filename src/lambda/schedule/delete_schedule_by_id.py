@@ -13,7 +13,7 @@ from utils.rbac import check_delete_permission_with_org
 
 def call_iot_delete_schedule_api(
     device_id: str,
-    job_id: str,
+    playback_id: str,
     iot_delete_api_url: str
 ) -> tuple[bool, Optional[str]]:
     """
@@ -21,7 +21,7 @@ def call_iot_delete_schedule_api(
     
     Args:
         device_id: Device ID (thingName)
-        job_id: Job ID to use as scheduleId
+        playback_id: Playback ID to use as scheduleId
         iot_delete_api_url: IoT delete API endpoint URL
         
     Returns:
@@ -31,12 +31,12 @@ def call_iot_delete_schedule_api(
         "action": "delete_schedule",
         "thingName": device_id,
         "payload": {
-            "scheduleId": job_id
+            "scheduleId": playback_id
         }
     }
     
     try:
-        print(f"Calling IoT delete API for device {device_id} with job_id {job_id}")
+        print(f"Calling IoT delete API for device {device_id} with playback_id {playback_id}")
         print(f"Payload: {json.dumps(payload, indent=2)}")
         
         response = requests.post(
@@ -112,9 +112,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Log user action for audit
         print(f"User {user_info['user_id']} ({user_info['role']}) deleting schedule {schedule_id}")
 
-        # Get job_id and assigned devices from schedule
-        job_id = schedule.get("job_id", "")
+        # Get assigned devices from schedule
         assigned_devices = schedule.get("assigned_to", [])
+        playback_id_raw = schedule.get("playback_id", "")
+        # Convert Decimal from DynamoDB to string for JSON serialization
+        playback_id = str(playback_id_raw) if playback_id_raw else ""
 
         # If no devices assigned, just delete from DB
         if not assigned_devices:
@@ -133,10 +135,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }),
             }
 
-        # If no job_id but devices are assigned, we can't delete from IoT devices
+        # If no playback_id but devices are assigned, we can't delete from IoT devices
         # but we should still allow deletion from DB (schedule may have failed to schedule)
-        if not job_id:
-            print(f"Warning: Schedule {schedule_id} has assigned devices but no job_id. Deleting from DB only.")
+        if not playback_id:
+            print(f"Warning: Schedule {schedule_id} has assigned devices but no playback_id. Deleting from DB only.")
             delete_error = delete_schedule_from_db(
                 schedule_id, schedules_table_name, device_table_name
             )
@@ -160,7 +162,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         for device_id in assigned_devices:
             success, error = call_iot_delete_schedule_api(
                 device_id=device_id,
-                job_id=job_id,
+                playback_id=playback_id,
                 iot_delete_api_url=iot_delete_api_url
             )
             
