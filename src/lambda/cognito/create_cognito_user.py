@@ -24,7 +24,7 @@ def get_cors_headers() -> Dict[str, str]:
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    f"""
+    """
     Lambda function to create a user in Cognito User Pool.
 
     Expected event structure:

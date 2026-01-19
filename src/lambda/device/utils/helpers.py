@@ -409,7 +409,7 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
     update_data = {}
 
     # Copy basic fields if they exist
-    basic_fields = ["name", "description", "model", "version", "ip_address", "status"]
+    basic_fields = ["name", "description", "model", "version", "ip_address", "status", "is_deleted"]
     for field in basic_fields:
         if field in body:
             update_data[field] = body[field]
