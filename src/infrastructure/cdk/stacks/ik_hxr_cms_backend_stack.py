@@ -937,7 +937,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(get_users_by_org_lambda, users_table, "read")
 
         grant_table_permissions(
-            create_organization_lambda, organizations_table, "write"
+            create_organization_lambda, organizations_table, "read_write"
         )
         grant_table_permissions(get_organization_lambda, organizations_table, "read")
         grant_table_permissions(
@@ -1017,6 +1017,20 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        create_initial_superadmin_lambda = create_lambda_function(
+            scope=self,
+            construct_id="CreateInitialSuperadminFunction",
+            function_name=f"Cms-CreateInitialSuperadmin-{env_name_capitalized}",
+            handler="create_initial_superadmin.handler",
+            code_path="src/lambda/cognito",
+            environment={
+                "USER_POOL_ID": user_pool.user_pool_id,
+                "USERS_TABLE_NAME": users_table.table_name,
+                "ORGANIZATIONS_TABLE_NAME": organizations_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Grant Cognito permissions to Cognito Lambda functions
         create_cognito_user_lambda.add_to_role_policy(
             iam.PolicyStatement(
@@ -1030,8 +1044,23 @@ class IkHxrCmsBackendStack(Stack):
             )
         )
 
+        create_initial_superadmin_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminAddUserToGroup",
+                    "cognito-idp:AdminGetUser",
+                    "cognito-idp:AdminSetUserPassword",
+                ],
+                resources=[user_pool.user_pool_arn],
+            )
+        )
+
         grant_table_permissions(create_cognito_user_lambda, users_table, "read_write")
         grant_table_permissions(create_cognito_user_lambda, organizations_table, "read_write")
+        grant_table_permissions(create_initial_superadmin_lambda, users_table, "read_write")
+        grant_table_permissions(create_initial_superadmin_lambda, organizations_table, "read_write")
         grant_table_permissions(change_password_lambda, users_table, "read_write")
 
 

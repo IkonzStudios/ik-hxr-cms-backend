@@ -68,6 +68,7 @@ def call_iot_schedule_api(
     for index, content in enumerate(contents):
         playback_payloads_to_be_created.append({
             "schedule_id": "",
+            "playback_id": "",
             "job_id": "",
             "device_id": device_id,
             "content_id": content["id"],
@@ -146,6 +147,7 @@ def schedule_content_on_iot_devices(
     start_at = schedule_data.get("start_at", "")
     end_at = schedule_data.get("end_at", "")
     schedule_id = schedule_data.get("id", "")
+    playback_id = schedule_data.get("playback_id", "")
     
     print(f"Starting IoT scheduling for schedule {schedule_id}")
     print(f"Assigned devices: {assigned_devices}")
@@ -172,9 +174,6 @@ def schedule_content_on_iot_devices(
     # Schedule content on each assigned device
     playback_payloads_to_be_created: List[Dict[str, Any]] = []
     for device_id in assigned_devices:
-        # Generate unique playback ID for this device
-        playback_id = int(time.time() * 1000);
-        
         success, error, response_data, device_playback_payloads = call_iot_schedule_api(
             device_id=device_id,
             schedule_time=start_at,

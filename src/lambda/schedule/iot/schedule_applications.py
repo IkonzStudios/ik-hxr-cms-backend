@@ -100,6 +100,7 @@ def schedule_applications_on_iot_devices(
     start_at = schedule_data.get("start_at", "")
     end_at = schedule_data.get("end_at", "")
     schedule_id = schedule_data.get("id", "")
+    playback_id = schedule_data.get("playback_id", "")
     
     print(f"Starting IoT application scheduling for schedule {schedule_id}")
     print(f"Assigned devices: {assigned_devices}")
@@ -124,9 +125,6 @@ def schedule_applications_on_iot_devices(
     
     # Schedule applications on each assigned device
     for device_id in assigned_devices:
-        # Generate unique playback ID for this device
-        playback_id = int(time.time() * 1000)
-        
         success, error, response_data = call_iot_application_schedule_api(
             device_id=device_id,
             schedule_time=start_at,

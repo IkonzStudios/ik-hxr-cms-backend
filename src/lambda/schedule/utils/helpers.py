@@ -3,10 +3,30 @@ import boto3
 import uuid
 import requests
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Any, Tuple, Optional, List
 from .constants import REQUIRED_SCHEDULE_FIELDS
 import time
 
+def convert_decimals_to_numbers(obj):
+    """
+    Recursively convert Decimal objects to float/int for JSON serialization.
+    
+    Args:
+        obj: Object that may contain Decimal values
+        
+    Returns:
+        Object with Decimal values converted to numbers
+    """
+    if isinstance(obj, Decimal):
+        # Convert Decimal to float, preserving precision
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_decimals_to_numbers(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals_to_numbers(item) for item in obj]
+    else:
+        return obj
 
 def get_cors_headers() -> Dict[str, str]:
     """
@@ -174,10 +194,12 @@ def create_schedule_data(body: Dict[str, Any]) -> Dict[str, Any]:
     # Generate schedule ID and timestamps
     schedule_id = str(uuid.uuid4())
     current_time = datetime.now().isoformat()
+    playback_id = int(time.time() * 1000);
 
     # Create schedule data dictionary
     schedule_data = {
         "id": schedule_id,
+        "playback_id": playback_id,
         "title": body.get("title", ""),
         "start_at": body["start_at"],
         "end_at": body["end_at"],
@@ -271,11 +293,14 @@ def create_success_response(schedule_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Success response dictionary
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_schedule_data = convert_decimals_to_numbers(schedule_data)
+    
     return {
         "statusCode": 201,
         "headers": get_cors_headers(),
         "body": json.dumps(
-            {"message": "Schedule created successfully", "data": schedule_data}
+            {"message": "Schedule created successfully", "data": converted_schedule_data}
         ),
     }
 
@@ -468,14 +493,17 @@ def create_schedules_list_response(schedules: list) -> Dict[str, Any]:
     Returns:
         Response dictionary with schedules list
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_schedules = convert_decimals_to_numbers(schedules)
+    
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
         "body": json.dumps(
             {
                 "message": "Schedules retrieved successfully",
-                "data": schedules,
-                "count": len(schedules),
+                "data": converted_schedules,
+                "count": len(converted_schedules),
             }
         ),
     }
@@ -488,11 +516,14 @@ def create_schedule_response(schedule: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Response dictionary with schedule data
     """
+    # Convert Decimal objects to numbers for JSON serialization
+    converted_schedule = convert_decimals_to_numbers(schedule)
+    
     return {
         "statusCode": 200,
         "headers": get_cors_headers(),
         "body": json.dumps(
-            {"message": "Schedule retrieved successfully", "data": schedule}
+            {"message": "Schedule retrieved successfully", "data": converted_schedule}
         ),
     }
 

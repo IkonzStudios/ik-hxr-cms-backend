@@ -24,7 +24,7 @@ def get_cors_headers() -> Dict[str, str]:
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """
+    f"""
     Lambda function to create a user in Cognito User Pool.
 
     Expected event structure:
@@ -34,6 +34,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "first_name": "John",
             "last_name": "Doe",
             "role": "user",
+            "organization_id: "",
             // For superadmin users creating a new organization:
             "organization_name": "Acme Corp", 
             "organization_license": "LICENSE-123"
@@ -94,47 +95,35 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Determine organization_id based on current user's role
         if current_user_role == "superadmin":
             # For superadmin, create a new organization if not provided
-            if "organization_name" not in body or "organization_license" not in body:
+            if "organization_id" in body:
+                organization_id = body["organization_id"]
+            elif "organization_name" in body and "organization_license" in body:
+                organization_id = str(uuid.uuid4())
+                # Create new organization
+                current_time = datetime.now().isoformat()
+                organization_data = {
+                    "id": organization_id,
+                    "name": body["organization_name"],
+                    "license": body["organization_license"],
+                    "created_at": current_time,
+                    "updated_at": current_time,
+                    "created_by": current_user_id,
+                    "updated_by": current_user_id,
+                }
+                 # Save organization to DynamoDB
+                dynamodb = boto3.resource("dynamodb")
+                organizations_table = dynamodb.Table(organizations_table_name)
+                
+                organizations_table.put_item(
+                    Item=organization_data,
+                    ConditionExpression="attribute_not_exists(id)"
+                )
+            else:
                 return {
                     "statusCode": 400,
                     "headers": get_cors_headers(),
                     "body": json.dumps({"error": "Superadmin must provide organization_name and organization_license"}),
                 }
-            
-            # Create new organization
-            organization_id = str(uuid.uuid4())
-            current_time = datetime.now().isoformat()
-            organization_data = {
-                "id": organization_id,
-                "name": body["organization_name"],
-                "license": body["organization_license"],
-                "created_at": current_time,
-                "updated_at": current_time,
-                "created_by": current_user_id,
-                "updated_by": current_user_id,
-            }
-            
-            # Save organization to DynamoDB
-            dynamodb = boto3.resource("dynamodb")
-            organizations_table = dynamodb.Table(organizations_table_name)
-            
-            # Check if license already exists
-            license_response = organizations_table.scan(
-                FilterExpression="license = :license",
-                ExpressionAttributeValues={":license": organization_data["license"]},
-            )
-            
-            if license_response["Items"]:
-                return {
-                    "statusCode": 409,
-                    "headers": get_cors_headers(),
-                    "body": json.dumps({"error": "Organization with this license already exists"}),
-                }
-            
-            organizations_table.put_item(
-                Item=organization_data,
-                ConditionExpression="attribute_not_exists(id)"
-            )
             
             body["organization_id"] = organization_id
             
