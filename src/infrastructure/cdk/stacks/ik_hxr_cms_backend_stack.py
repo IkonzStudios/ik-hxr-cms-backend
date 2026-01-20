@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_iam as iam,
     Duration,
 )
+import json
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
@@ -43,6 +44,32 @@ class IkHxrCmsBackendStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
+
+        # ============ DEVICE ENVIRONMENT ROUTING CONFIGURATION ============
+        # Map device IDs to their environments (prod, stage, or dev)
+        # Update this mapping with your actual device IDs and their environments
+        device_env_mapping = {
+            "fedora-device-47d1ef44d6444dd9bf5d6acf80c185b1": "prod",
+            "fedora-device-9a33e763ec854b0c91ad6b5aafb13ea7": "prod",
+            "fedora-device-20242b43635b47f28dfddefa91ea2e45": "prod",
+            "fedora-device-5467bddb18624095a96c912de6ae5ddd": "prod",
+            "fedora-device-3a7feafd18c3443aabb918a79995125e": "prod",
+            "fedora-device-24fdaf77fc624fdd9694159c401aa754": "prod",
+            "fedora-device-7bc52143e92b4e4f959738304063a1c1": "prod",
+            "fedora-device-8505041c3dca4e65aa1a1c9b5e6b52ab": "prod",
+            # "fedora": "stage",
+            "fedora-device-8529586edce5408fb79c6f0026af1bb6": "dev" # Local-VM-Jino
+
+        }
+        
+        # Environment-specific API URLs for cross-environment routing
+        # These should be the actual API Gateway URLs for each environment
+        # Update these after deploying each environment
+        environment_api_urls = {
+            "stage": "https://nalf5z1pxh.execute-api.ap-south-1.amazonaws.com/stage/device/status",
+            "dev": "https://wztl4nwcy5.execute-api.us-east-2.amazonaws.com/dev/device/status"
+        }
+        # ==================================================================
 
         env_name_capitalized = env_name.capitalize() if env_name else "Dev"
 
@@ -285,7 +312,12 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
+                # Environment routing configuration
+                "DEVICE_ENV_MAPPING": json.dumps(device_env_mapping),
+                "STAGE_API_URL": environment_api_urls.get("stage", ""),
+                "DEV_API_URL": environment_api_urls.get("dev", ""),
             },
+            layers=[common_dependencies_layer],  # Add requests library for API forwarding
         )
 
         # Create Content Lambda functions

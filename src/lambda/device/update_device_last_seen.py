@@ -15,6 +15,80 @@ from utils.helpers import (
 )
 
 
+def get_device_environment(device_id: str) -> str:
+    """
+    Determine which environment a device belongs to.
+    
+    Args:
+        device_id: The device ID to check
+        
+    Returns:
+        Environment name: 'prod', 'stage', or 'dev'
+    """
+    # Get device-environment mapping from environment variable
+    try:
+        device_env_map_str = os.environ.get("DEVICE_ENV_MAPPING", "{}")
+        device_env_map = json.loads(device_env_map_str)
+        return device_env_map.get(device_id, "prod")  # Default to prod if not found
+    except json.JSONDecodeError:
+        print(f"Warning: Invalid DEVICE_ENV_MAPPING format. Defaulting to prod.")
+        return "prod"
+
+
+def forward_to_environment_api(event: Dict[str, Any], target_env: str) -> Dict[str, Any]:
+    """
+    Forward the request to another environment's API.
+    
+    Args:
+        event: The original Lambda event
+        target_env: Target environment ('stage' or 'dev')
+        
+    Returns:
+        API Gateway response dict
+    """
+    try:
+        import requests
+    except ImportError:
+        return create_error_response(500, "requests library not available for API forwarding")
+    
+    # Get target environment API URL
+    env_urls = {
+        "stage": os.environ.get("STAGE_API_URL"),
+        "dev": os.environ.get("DEV_API_URL")
+    }
+    
+    target_url = env_urls.get(target_env)
+    if not target_url:
+        return create_error_response(500, f"No API URL configured for environment: {target_env}")
+    
+    # Extract body from event
+    if isinstance(event.get("body"), str):
+        body_data = json.loads(event.get("body", "{}"))
+    else:
+        body_data = event.get("body", {})
+    
+    print(f"Forwarding request to {target_env} environment: {target_url}")
+    
+    try:
+        # Forward the request to the target environment
+        response = requests.post(
+            target_url,
+            json=body_data,
+            headers={"Content-Type": "application/json"},
+            timeout=30  # 30 second timeout
+        )
+        
+        # Return the response from the target environment
+        return {
+            "statusCode": response.status_code,
+            "headers": get_cors_headers(),
+            "body": response.text
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error forwarding request to {target_env}: {str(e)}")
+        return create_error_response(502, f"Failed to forward request to {target_env} environment")
+
+
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Lambda function to update a device's last_seen timestamp in DynamoDB.
@@ -57,6 +131,27 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Check if body has device_id
         if not body or not body.get("device_id"):
             return create_error_response(400, "device_id is required in request body")
+
+        device_id = body["device_id"]
+
+        print(f"Device ID: {device_id}")
+        
+        # ============ ENVIRONMENT ROUTING LOGIC ============
+        # Check which environment this device belongs to
+        device_env = get_device_environment(device_id)
+        current_env = os.environ.get("ENV", "prod")
+        
+        print(f"Device {device_id} belongs to environment: {device_env}")
+        print(f"Current environment: {current_env}")
+        
+        # If device belongs to a different environment (stage or dev), forward the request
+        if device_env != current_env and device_env in ["stage", "dev"]:
+            print(f"Forwarding device {device_id} request from {current_env} to {device_env}")
+            return forward_to_environment_api(event, device_env)
+        
+        # If device belongs to prod or current environment, continue with normal processing
+        print(f"Processing device {device_id} locally in {current_env} environment")
+        # ===================================================
 
         # Validate expected structure - only allow device_id, ip_address, cpu_usage, memory_usage
         expected_fields = {"device_id", "ip_address", "cpu_usage", "memory_usage"}
