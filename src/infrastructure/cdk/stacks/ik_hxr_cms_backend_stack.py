@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_lambda_event_sources as lambda_event_sources,
     RemovalPolicy,
     aws_iam as iam,
+    aws_dynamodb as dynamodb,
     Duration,
 )
 import json
@@ -45,23 +46,6 @@ class IkHxrCmsBackendStack(Stack):
 
         IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
 
-        # ============ DEVICE ENVIRONMENT ROUTING CONFIGURATION ============
-        # Map device IDs to their environments (prod, stage, or dev)
-        # Update this mapping with your actual device IDs and their environments
-        device_env_mapping = {
-            "fedora-device-47d1ef44d6444dd9bf5d6acf80c185b1": "prod",
-            "fedora-device-9a33e763ec854b0c91ad6b5aafb13ea7": "prod",
-            "fedora-device-20242b43635b47f28dfddefa91ea2e45": "prod",
-            "fedora-device-5467bddb18624095a96c912de6ae5ddd": "prod",
-            "fedora-device-3a7feafd18c3443aabb918a79995125e": "prod",
-            "fedora-device-24fdaf77fc624fdd9694159c401aa754": "prod",
-            "fedora-device-7bc52143e92b4e4f959738304063a1c1": "prod",
-            "fedora-device-8505041c3dca4e65aa1a1c9b5e6b52ab": "prod",
-            # "fedora": "stage",
-            "fedora-device-8529586edce5408fb79c6f0026af1bb6": "dev" # Local-VM-Jino
-
-        }
-        
         # Environment-specific API URLs for cross-environment routing
         # These should be the actual API Gateway URLs for each environment
         # Update these after deploying each environment
@@ -313,7 +297,7 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
                 # Environment routing configuration
-                "DEVICE_ENV_MAPPING": json.dumps(device_env_mapping),
+                "DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV": "cms-devices-stage-and-dev",
                 "STAGE_API_URL": environment_api_urls.get("stage", ""),
                 "DEV_API_URL": environment_api_urls.get("dev", ""),
             },
@@ -930,6 +914,12 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_last_seen_lambda, contents_table, "read")
         grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
+
+        # Import the stage/dev devices table to grant scan permissions for environment routing
+        stage_dev_devices_table = dynamodb.Table.from_table_name(
+            self, "StageDevDevicesTableRouting", "cms-devices-stage-and-dev"
+        )
+        grant_table_permissions(update_device_last_seen_lambda, stage_dev_devices_table, "read")
         grant_table_permissions(upload_base_video_lambda, devices_table, "read")
         
         # Grant S3 permissions to upload base video Lambda

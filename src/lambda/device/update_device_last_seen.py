@@ -25,13 +25,23 @@ def get_device_environment(device_id: str) -> str:
     Returns:
         Environment name: 'prod', 'stage', or 'dev'
     """
-    # Get device-environment mapping from environment variable
+    # Get device-environment mapping from table
     try:
-        device_env_map_str = os.environ.get("DEVICE_ENV_MAPPING", "{}")
-        device_env_map = json.loads(device_env_map_str)
-        return device_env_map.get(device_id, "prod")  # Default to prod if not found
-    except json.JSONDecodeError:
-        print(f"Warning: Invalid DEVICE_ENV_MAPPING format. Defaulting to prod.")
+        table_name = os.environ.get("DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV")
+        if not table_name:
+            raise ValueError("DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV environment variable not set")
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        response = table.scan()
+        devices = response["Items"];
+        print(f"Devices: {devices}")
+        for device in devices:
+            if device["id"] == device_id:
+                return device["environment"]
+        return "prod"  # Default to prod if not found
+    except Exception as e:
+        print(f"Error getting device environment: {str(e)}")
         return "prod"
 
 
