@@ -6,8 +6,10 @@ from aws_cdk import (
     aws_lambda_event_sources as lambda_event_sources,
     RemovalPolicy,
     aws_iam as iam,
+    aws_dynamodb as dynamodb,
     Duration,
 )
+import json
 from constructs import Construct
 from database.dynamodb.tables.devices import create_devices_table
 from database.dynamodb.tables.contents import create_contents_table
@@ -43,6 +45,15 @@ class IkHxrCmsBackendStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
+
+        # Environment-specific API URLs for cross-environment routing
+        # These should be the actual API Gateway URLs for each environment
+        # Update these after deploying each environment
+        environment_api_urls = {
+            "stage": "https://nalf5z1pxh.execute-api.ap-south-1.amazonaws.com/stage",
+            "dev": "https://wztl4nwcy5.execute-api.us-east-2.amazonaws.com/dev"
+        }
+        # ==================================================================
 
         env_name_capitalized = env_name.capitalize() if env_name else "Dev"
 
@@ -285,7 +296,12 @@ class IkHxrCmsBackendStack(Stack):
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
+                # Environment routing configuration
+                "DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV": "cms-devices-stage-and-dev",
+                "STAGE_API_URL": environment_api_urls.get("stage", ""),
+                "DEV_API_URL": environment_api_urls.get("dev", ""),
             },
+            layers=[common_dependencies_layer],  # Add requests library for API forwarding
         )
 
         # Create Content Lambda functions
@@ -862,7 +878,12 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "STATUS_UPDATE_QUEUE_URL": status_update_queue.queue_url,
                 "ENV": env_name,
+                # Environment routing configuration
+                "DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV": "cms-devices-stage-and-dev",
+                "STAGE_API_URL": environment_api_urls.get("stage", ""),
+                "DEV_API_URL": environment_api_urls.get("dev", ""),
             },
+            layers=[common_dependencies_layer],
         )
 
         # Create Status Update Queue Processor Lambda function
@@ -898,6 +919,14 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_last_seen_lambda, contents_table, "read")
         grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
+
+        # Import the stage/dev devices table to grant scan permissions for environment routing
+        stage_dev_devices_table = dynamodb.Table.from_table_name(
+            self, "StageDevDevicesTableRouting", "cms-devices-stage-and-dev"
+        )
+        grant_table_permissions(update_device_last_seen_lambda, stage_dev_devices_table, "read")
+        grant_table_permissions(update_status_lambda, stage_dev_devices_table, "read")
+
         grant_table_permissions(upload_base_video_lambda, devices_table, "read")
         
         # Grant S3 permissions to upload base video Lambda
