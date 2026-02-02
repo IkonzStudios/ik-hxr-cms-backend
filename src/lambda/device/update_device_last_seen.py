@@ -82,7 +82,7 @@ def forward_to_environment_api(event: Dict[str, Any], target_env: str) -> Dict[s
     try:
         # Forward the request to the target environment
         response = requests.post(
-            target_url,
+            target_url + "/device/status",
             json=body_data,
             headers={"Content-Type": "application/json"},
             timeout=30  # 30 second timeout

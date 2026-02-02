@@ -50,8 +50,8 @@ class IkHxrCmsBackendStack(Stack):
         # These should be the actual API Gateway URLs for each environment
         # Update these after deploying each environment
         environment_api_urls = {
-            "stage": "https://nalf5z1pxh.execute-api.ap-south-1.amazonaws.com/stage/device/status",
-            "dev": "https://wztl4nwcy5.execute-api.us-east-2.amazonaws.com/dev/device/status"
+            "stage": "https://nalf5z1pxh.execute-api.ap-south-1.amazonaws.com/stage",
+            "dev": "https://wztl4nwcy5.execute-api.us-east-2.amazonaws.com/dev"
         }
         # ==================================================================
 
@@ -878,7 +878,12 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "STATUS_UPDATE_QUEUE_URL": status_update_queue.queue_url,
                 "ENV": env_name,
+                # Environment routing configuration
+                "DEVICES_TABLE_NAME_FOR_STAGE_AND_DEV": "cms-devices-stage-and-dev",
+                "STAGE_API_URL": environment_api_urls.get("stage", ""),
+                "DEV_API_URL": environment_api_urls.get("dev", ""),
             },
+            layers=[common_dependencies_layer],
         )
 
         # Create Status Update Queue Processor Lambda function
@@ -920,6 +925,8 @@ class IkHxrCmsBackendStack(Stack):
             self, "StageDevDevicesTableRouting", "cms-devices-stage-and-dev"
         )
         grant_table_permissions(update_device_last_seen_lambda, stage_dev_devices_table, "read")
+        grant_table_permissions(update_status_lambda, stage_dev_devices_table, "read")
+
         grant_table_permissions(upload_base_video_lambda, devices_table, "read")
         
         # Grant S3 permissions to upload base video Lambda
