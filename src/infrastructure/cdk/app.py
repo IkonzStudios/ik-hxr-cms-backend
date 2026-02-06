@@ -16,7 +16,7 @@ app = App()
 env_name = app.node.try_get_context("env") or "dev"
 
 environments = {
-    "dev": {"stack_name": "IkHxrCmsBackendStack-Dev", "region": "us-east-2"},
+    "dev": {"stack_name": "IkHxrCmsBackendStack-Dev", "region": "ap-south-1"},
     "stage": {"stack_name": "IkHxrCmsBackendStack-Stage", "region": "ap-south-1"},
     "prod": {"stack_name": "IkHxrCmsBackendStack-Prod", "region": "ap-south-1"},
 }

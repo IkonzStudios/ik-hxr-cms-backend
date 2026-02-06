@@ -51,7 +51,7 @@ class IkHxrCmsBackendStack(Stack):
         # Update these after deploying each environment
         environment_api_urls = {
             "stage": "https://nalf5z1pxh.execute-api.ap-south-1.amazonaws.com/stage",
-            "dev": "https://wztl4nwcy5.execute-api.us-east-2.amazonaws.com/dev"
+            "dev": "https://7mi1thzit5.execute-api.ap-south-1.amazonaws.com/dev"
         }
         # ==================================================================
 

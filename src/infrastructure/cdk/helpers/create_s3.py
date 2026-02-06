@@ -15,7 +15,7 @@ def create_content_bucket(
     # Create bucket with auto-generated name to avoid conflicts
     bucket = s3.Bucket(
         scope,
-        "ContentStorageBucket",
+        "ContentStorageBucketV2",
         # Remove bucket_name to let CDK generate a unique name
         versioned=True,
         encryption=s3.BucketEncryption.S3_MANAGED,

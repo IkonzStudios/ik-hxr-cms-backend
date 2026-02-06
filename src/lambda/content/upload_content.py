@@ -190,7 +190,12 @@ def generate_presigned_post(
     Returns:
         Dictionary containing presigned POST URL and fields
     """
-    s3_client = boto3.client("s3")
+    # Configure S3 client with explicit signature version, region, and endpoint
+    region = os.environ.get("AWS_REGION")
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"https://s3.{region}.amazonaws.com"
+    )
 
     # Set content type based on file extension
     content_type = get_content_type(file_name)

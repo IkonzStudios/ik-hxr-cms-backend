@@ -11,6 +11,8 @@ def create_devices_table(scope: Construct, env_name: str = None) -> dynamodb.Tab
         partition_key=dynamodb.Attribute(name="id", type=dynamodb.AttributeType.STRING),
         billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         removal_policy=RemovalPolicy.RETAIN,
-        point_in_time_recovery=True,
+        point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+            point_in_time_recovery_enabled=True
+        ),
         encryption=dynamodb.TableEncryption.AWS_MANAGED,
     )
