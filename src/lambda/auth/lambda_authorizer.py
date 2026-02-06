@@ -175,8 +175,8 @@ def get_base_arn(method_arn: str) -> str:
     Convert a method ARN with actual parameter values to a base ARN format.
     
     Example:
-    Input:  arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/dev/GET/playlist/organization/73ffc2ad-1551-49fa-864c-133a60e9e2ef
-    Output: arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5/*/*
+    Input:  arn:aws:execute-api:ap-south-1:217968404084:wztl4nwcy5/dev/GET/playlist/organization/73ffc2ad-1551-49fa-864c-133a60e9e2ef
+    Output: arn:aws:execute-api:ap-south-1:217968404084:wztl4nwcy5/*/*
     """
     try:
         # Split the ARN into parts
@@ -187,7 +187,7 @@ def get_base_arn(method_arn: str) -> str:
             return method_arn
         
         # Extract the base ARN (everything before the stage)
-        base_arn = arn_parts[0]  # arn:aws:execute-api:us-east-2:217968404084:wztl4nwcy5
+        base_arn = arn_parts[0]  # arn:aws:execute-api:ap-south-1:217968404084:wztl4nwcy5
        
         # Reconstruct the ARN with wildcard stage and template path
         template_arn = f"{base_arn}/*/*"
