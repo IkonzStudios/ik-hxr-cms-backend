@@ -119,6 +119,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         table_name = os.environ.get("DEVICES_TABLE_NAME")
         contents_table_name = os.environ.get("CONTENTS_TABLE_NAME")
         playbacks_table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
+        device_pings_table_name = os.environ.get("DEVICE_PINGS_TABLE_NAME")
         schedules_table_name = os.environ.get("SCHEDULES_TABLE_NAME")
 
         if not table_name:
@@ -129,6 +130,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             raise ValueError("CONTENTS_TABLE_NAME environment variable not set")
         if not schedules_table_name:
             raise ValueError("SCHEDULES_TABLE_NAME environment variable not set")
+        if not device_pings_table_name:
+            raise ValueError("DEVICE_PINGS_TABLE_NAME environment variable not set")
 
         # Debug: Print the event structure
         print(f"Event: {json.dumps(event)}")
@@ -284,6 +287,17 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if update_error:
             return update_error
 
+        # Record ping in device_pings table (one record per device per day: pings[], first_seen, last_seen)
+        record_error = record_device_ping(
+            device_id=device_id,
+            date_str=current_date.isoformat(),
+            current_time=current_time,
+            table_name=device_pings_table_name,
+        )
+        if record_error:
+            # Log but do not fail the request; device last_seen was already updated
+            print(f"Warning: failed to record device ping: {record_error}")
+
         # Return success response
         return {
             "statusCode": 200,
@@ -350,6 +364,45 @@ def update_device_last_seen_in_db(
         if "ConditionalCheckFailedException" in str(e):
             raise ValueError("Device not found")
         raise e
+
+
+def record_device_ping(
+    device_id: str, date_str: str, current_time: str, table_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Record a device ping in the device_pings table (one item per device per day).
+    Appends current_time to pings list, sets last_seen, and first_seen if new item.
+
+    Args:
+        device_id: The device ID
+        date_str: ISO date string for the day (e.g. "2025-02-09") in IST
+        current_time: ISO timestamp of the ping
+        table_name: The device_pings DynamoDB table name
+
+    Returns:
+        None on success, or an error response dict on failure
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+        table.update_item(
+            Key={"device_id": device_id, "date": date_str},
+            UpdateExpression="SET #last_seen = :current_time, #first_seen = if_not_exists(#first_seen, :current_time), #pings = list_append(if_not_exists(#pings, :empty), :new_ping)",
+            ExpressionAttributeNames={
+                "#last_seen": "last_seen",
+                "#first_seen": "first_seen",
+                "#pings": "pings",
+            },
+            ExpressionAttributeValues={
+                ":current_time": current_time,
+                ":empty": [],
+                ":new_ping": [current_time],
+            },
+        )
+        return None
+    except Exception as e:
+        print(f"Error recording device ping in database: {str(e)}")
+        return {"statusCode": 500, "body": str(e)}
 
 
 def get_all_last_seen_date_schedules_duration_from_db(schedule_ids: list, schedules_table_name: str, last_seen_date) -> Tuple[float, Optional[Dict[str, Any]]]:
