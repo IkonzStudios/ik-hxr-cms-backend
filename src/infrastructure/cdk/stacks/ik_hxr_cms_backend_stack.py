@@ -16,6 +16,7 @@ from database.dynamodb.tables.contents import create_contents_table
 from database.dynamodb.tables.schedules import create_schedules_table
 from database.dynamodb.tables.playlists import create_playlists_table
 from database.dynamodb.tables.playbacks import create_playbacks_table
+from database.dynamodb.tables.device_pings import create_device_pings_table
 from database.dynamodb.tables.users import create_users_table
 from database.dynamodb.tables.organizations import create_organizations_table
 from database.dynamodb.tables.applications import create_applications_table
@@ -94,6 +95,7 @@ class IkHxrCmsBackendStack(Stack):
         schedules_table = create_schedules_table(self, env_name)
         playlists_table = create_playlists_table(self, env_name)
         playbacks_table = create_playbacks_table(self, env_name)
+        device_pings_table = create_device_pings_table(self, env_name)
         users_table = create_users_table(self, env_name)
         organizations_table = create_organizations_table(self, env_name)
         applications_table = create_applications_table(self, env_name)
@@ -294,6 +296,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
+                "DEVICE_PINGS_TABLE_NAME": device_pings_table.table_name,
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "ENV": env_name,
                 # Environment routing configuration
@@ -918,6 +921,7 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_last_seen_lambda, devices_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, contents_table, "read")
         grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
+        grant_table_permissions(update_device_last_seen_lambda, device_pings_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
 
         # Import the stage/dev devices table to grant scan permissions for environment routing
