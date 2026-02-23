@@ -307,6 +307,19 @@ class IkHxrCmsBackendStack(Stack):
             layers=[common_dependencies_layer],  # Add requests library for API forwarding
         )
 
+        get_device_pings_lambda = create_lambda_function(
+            scope=self,
+            construct_id="GetDevicePingsFunction",
+            function_name=f"Cms-GetDevicePings-{env_name_capitalized}",
+            handler="get_device_pings.handler",
+            code_path="src/lambda/device",
+            environment={
+                "DEVICES_TABLE_NAME": devices_table.table_name,
+                "DEVICE_PINGS_TABLE_NAME": device_pings_table.table_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create Content Lambda functions
         create_content_lambda = create_lambda_function(
             scope=self,
@@ -923,6 +936,8 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(update_device_last_seen_lambda, playbacks_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, device_pings_table, "read_write")
         grant_table_permissions(update_device_last_seen_lambda, schedules_table, "read")
+        grant_table_permissions(get_device_pings_lambda, devices_table, "read")
+        grant_table_permissions(get_device_pings_lambda, device_pings_table, "read")
 
         # Import the stage/dev devices table to grant scan permissions for environment routing
         stage_dev_devices_table = dynamodb.Table.from_table_name(
@@ -1150,6 +1165,7 @@ class IkHxrCmsBackendStack(Stack):
         organization_resource = device_resource.add_resource("organization")
         org_id_resource = organization_resource.add_resource("{orgId}")
         device_last_seen_resource = device_resource.add_resource("status")
+        device_pings_resource = device_resource.add_resource("pings")
 
         # Lambda integrations for basic device operations
         create_device_integration = apigateway.LambdaIntegration(create_device_lambda)
@@ -1160,6 +1176,9 @@ class IkHxrCmsBackendStack(Stack):
         )
         update_device_last_seen_integration = apigateway.LambdaIntegration(
             update_device_last_seen_lambda
+        )
+        get_device_pings_integration = apigateway.LambdaIntegration(
+            get_device_pings_lambda
         )
 
         # Basic device API methods
@@ -1179,6 +1198,11 @@ class IkHxrCmsBackendStack(Stack):
         # Device last seen update endpoint (no auth required for device self-reporting)
         device_last_seen_resource.add_method(
             "POST", update_device_last_seen_integration
+        )
+
+        # Device pings (online status) GET: ?device_id=xxx&start=YYYY-MM-DD&end=YYYY-MM-DD
+        device_pings_resource.add_method(
+            "GET", get_device_pings_integration, authorizer=authorizer
         )
 
         # Device Assignment API Resources and Methods
