@@ -47,9 +47,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         applications_table_name = os.environ.get("APPLICATIONS_TABLE_NAME")
         playbacks_table_name = os.environ.get("PLAYBACKS_TABLE_NAME")
         iot_schedule_api_url = os.environ.get("IOT_SCHEDULE_API_URL")
+        iot_schedule_api_url_old = os.environ.get("IOT_SCHEDULE_API_URL_OLD")
         default_s3_bucket = os.environ.get("CONTENT_BUCKET_NAME")
         device_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        
+
         if not schedules_table_name:
             raise ValueError("SCHEDULES_TABLE_NAME environment variable not set")
         if not playlists_table_name:
@@ -117,7 +118,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             iot_success, iot_errors, iot_responses = schedule_applications_on_iot_devices(
                 schedule_data=schedule_data,
                 applications_table_name=applications_table_name,
-                iot_api_url=iot_schedule_api_url
+                iot_api_url=iot_schedule_api_url,
+                iot_api_url_old=iot_schedule_api_url_old,
+                devices_table_name=device_table_name,
             )
         else:
             print("Content schedule")
@@ -127,6 +130,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 playlists_table_name=playlists_table_name,
                 contents_table_name=contents_table_name,
                 iot_api_url=iot_schedule_api_url,
+                iot_api_url_old=iot_schedule_api_url_old,
+                devices_table_name=device_table_name,
                 default_s3_bucket=default_s3_bucket
             )
         

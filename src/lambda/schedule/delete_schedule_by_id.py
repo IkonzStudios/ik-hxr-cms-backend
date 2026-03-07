@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+import boto3
 from typing import Dict, Any, Optional
 from utils.helpers import (
     get_schedule_by_id_from_db,
@@ -79,7 +80,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         schedules_table_name = os.environ.get("SCHEDULES_TABLE_NAME")
         device_table_name = os.environ.get("DEVICES_TABLE_NAME")
         iot_delete_api_url = os.environ.get("IOT_DELETE_API_URL")
-        
+        iot_delete_api_url_old = os.environ.get("IOT_DELETE_API_URL_OLD")
+
         if not schedules_table_name:
             raise ValueError("SCHEDULES_TABLE_NAME environment variable not set")
         if not device_table_name:
@@ -155,15 +157,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }),
             }
 
-        # Call IoT delete API for each assigned device
+        # Call IoT delete API for each assigned device (use IOT_DELETE_API_URL_OLD if device.region is us-east-2)
         iot_success = False
         iot_errors = []
-        
+        dynamodb = boto3.resource("dynamodb")
+        devices_table = dynamodb.Table(device_table_name)
+
         for device_id in assigned_devices:
+            device_item = None
+            try:
+                resp = devices_table.get_item(Key={"id": device_id})
+                device_item = resp.get("Item") if resp else None
+            except Exception as e:
+                print(f"Could not get device {device_id} for region: {e}")
+            use_old = device_item and device_item.get("region") == "us-east-2" and iot_delete_api_url_old
+            url = (iot_delete_api_url_old if use_old else iot_delete_api_url) or iot_delete_api_url
+
             success, error = call_iot_delete_schedule_api(
                 device_id=device_id,
                 playback_id=playback_id,
-                iot_delete_api_url=iot_delete_api_url
+                iot_delete_api_url=url
             )
             
             if success:
