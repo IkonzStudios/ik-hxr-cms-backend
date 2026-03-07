@@ -106,8 +106,9 @@ def call_iot_schedule_api(
         )
         
         print(f"IoT API Response Status for device {device_id}: {response.status_code}")
+        print (f"Iot API URL: {iot_api_url}")
+        print (f"Response: {response}")
         print(f"IoT API Response: {response.text}")
-        
         if response.status_code == 200:
             response_data = response.json() if response.text else {}
             return True, None, response_data, playback_payloads_to_be_created
@@ -125,22 +126,29 @@ def schedule_content_on_iot_devices(
     playlists_table_name: str,
     contents_table_name: str,
     iot_api_url: str,
+    iot_api_url_old: Optional[str],
+    devices_table_name: str,
     default_s3_bucket: str
 ) -> Tuple[bool, List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Schedule content on IoT devices after successful schedule creation.
-    
+    Uses IOT_API_URL_OLD (us-east-2) when device.region is "us-east-2", else IOT_API_URL.
+
     Args:
         schedule_data: Complete schedule data from database
         playlists_table_name: DynamoDB table name for playlists
         contents_table_name: DynamoDB table name for contents
-        iot_api_url: IoT API endpoint URL
+        iot_api_url: IoT API endpoint URL (default region)
+        iot_api_url_old: IoT API endpoint URL for us-east-2 devices
+        devices_table_name: DynamoDB table name for devices (to read region)
         default_s3_bucket: Default S3 bucket name
-        
+
     Returns:
         Tuple of (overall_success, error_messages, iot_responses, playback_payloads_to_be_created)
     """
-    
+    dynamodb = boto3.resource("dynamodb")
+    devices_table = dynamodb.Table(devices_table_name)
+
     assigned_devices = schedule_data.get("assigned_to", [])
     playlists = schedule_data.get("playlists", [])
     contents = schedule_data.get("contents", [])
@@ -171,16 +179,25 @@ def schedule_content_on_iot_devices(
     iot_responses = []
     successful_devices = 0
     
-    # Schedule content on each assigned device
+    # Schedule content on each assigned device (pick IoT URL by device region)
     playback_payloads_to_be_created: List[Dict[str, Any]] = []
     for device_id in assigned_devices:
+        device_item = None
+        try:
+            resp = devices_table.get_item(Key={"id": device_id})
+            device_item = resp.get("Item") if resp else None
+        except Exception as e:
+            print(f"Could not get device {device_id} for region: {e}")
+        use_old = device_item and device_item.get("region") == "us-east-2" and iot_api_url_old
+        url = (iot_api_url_old if use_old else iot_api_url) or iot_api_url
+
         success, error, response_data, device_playback_payloads = call_iot_schedule_api(
             device_id=device_id,
             schedule_time=start_at,
             schedule_time_end=end_at,
             playback_id=playback_id,
             contents=content_list,
-            iot_api_url=iot_api_url
+            iot_api_url=url
         )
         
         if device_playback_payloads:

@@ -81,20 +81,27 @@ def call_iot_application_schedule_api(
 def schedule_applications_on_iot_devices(
     schedule_data: Dict[str, Any],
     applications_table_name: str,
-    iot_api_url: str
+    iot_api_url: str,
+    iot_api_url_old: Optional[str],
+    devices_table_name: str,
 ) -> Tuple[bool, List[str], List[Dict[str, Any]]]:
     """
     Schedule applications on IoT devices after successful schedule creation.
-    
+    Uses IOT_API_URL_OLD (us-east-2) when device.region is "us-east-2", else IOT_API_URL.
+
     Args:
         schedule_data: Complete schedule data from database
         applications_table_name: DynamoDB table name for applications
-        iot_api_url: IoT API endpoint URL
-        
+        iot_api_url: IoT API endpoint URL (default region)
+        iot_api_url_old: IoT API endpoint URL for us-east-2 devices
+        devices_table_name: DynamoDB table name for devices (to read region)
+
     Returns:
         Tuple of (overall_success, error_messages, iot_responses)
     """
-    
+    dynamodb = boto3.resource("dynamodb")
+    devices_table = dynamodb.Table(devices_table_name)
+
     assigned_devices = schedule_data.get("assigned_to", [])
     applications = schedule_data.get("applications", [])
     start_at = schedule_data.get("start_at", "")
@@ -123,15 +130,24 @@ def schedule_applications_on_iot_devices(
     iot_responses = []
     successful_devices = 0
     
-    # Schedule applications on each assigned device
+    # Schedule applications on each assigned device (pick IoT URL by device region)
     for device_id in assigned_devices:
+        device_item = None
+        try:
+            resp = devices_table.get_item(Key={"id": device_id})
+            device_item = resp.get("Item") if resp else None
+        except Exception as e:
+            print(f"Could not get device {device_id} for region: {e}")
+        use_old = device_item and device_item.get("region") == "us-east-2" and iot_api_url_old
+        url = (iot_api_url_old if use_old else iot_api_url) or iot_api_url
+
         success, error, response_data = call_iot_application_schedule_api(
             device_id=device_id,
             schedule_time=start_at,
             schedule_time_end=end_at,
             playback_id=playback_id,
             applications=application_list,
-            iot_api_url=iot_api_url
+            iot_api_url=url
         )
         
         if success:

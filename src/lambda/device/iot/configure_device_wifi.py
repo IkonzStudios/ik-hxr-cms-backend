@@ -11,7 +11,8 @@ from utils.helpers import (
     create_error_response,
 )
 from utils.rbac import check_edit_permission_with_org
-from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES, IOT_API_URL
+from utils.helpers import get_iot_url_for_device
+from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -35,8 +36,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # Get environment variables
         devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_api_url = os.environ.get("IOT_API_URL", IOT_API_URL + "/config")
-        
+
         if not devices_table_name:
             return create_error_response(500, DEVICE_ERROR_MESSAGES["MISSING_ENVIRONMENT_VAR"])
 
@@ -62,6 +62,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Log user action for audit
         print(f"User {user_info['user_id']} ({user_info['role']}) configuring WiFi for device {device_id}")
+
+        # Select IoT API URL based on device region (us-east-2 -> IOT_API_URL_OLD)
+        iot_api_url = get_iot_url_for_device(existing_device, "IOT_API_URL", "IOT_API_URL_OLD")
+        if not iot_api_url:
+            return create_error_response(500, DEVICE_ERROR_MESSAGES["MISSING_ENVIRONMENT_VAR"])
 
         # Parse request body
         body, parse_error = parse_request_body(event)

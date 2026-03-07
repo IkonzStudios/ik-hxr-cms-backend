@@ -8,6 +8,20 @@ from typing import Dict, Any, Tuple, Optional
 from .constants import REQUIRED_DEVICE_FIELDS
 
 
+def get_iot_url_for_device(
+    device: Optional[Dict[str, Any]],
+    url_env_key: str,
+    url_old_env_key: str,
+) -> str:
+    """
+    Return the IoT API URL to use based on the device's region.
+    If device has region "us-east-2", use the _OLD URL (Ohio); otherwise use the default URL.
+    """
+    if device and device.get("region") == "us-east-2":
+        return os.environ.get(url_old_env_key) or os.environ.get(url_env_key) or ""
+    return os.environ.get(url_env_key) or ""
+
+
 def get_cors_headers() -> Dict[str, str]:
     """
     Get standard CORS headers for all responses.

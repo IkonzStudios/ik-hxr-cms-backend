@@ -45,7 +45,8 @@ class IkHxrCmsBackendStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        IOT_API_URL = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
+        IOT_API_URL = "https://p54cz8wrzh.execute-api.ap-south-1.amazonaws.com/dev"
+        IOT_API_URL_OLD = "https://hoavw9kvxg.execute-api.us-east-2.amazonaws.com/dev"
 
         # Environment-specific API URLs for cross-environment routing
         # These should be the actual API Gateway URLs for each environment
@@ -269,6 +270,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
+                "IOT_ASSIGN_API_URL_OLD": IOT_API_URL_OLD + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -428,6 +430,7 @@ class IkHxrCmsBackendStack(Stack):
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
                 "PLAYBACKS_TABLE_NAME": playbacks_table.table_name,
                 "IOT_SCHEDULE_API_URL": IOT_API_URL + "/schedule",
+                "IOT_SCHEDULE_API_URL_OLD": IOT_API_URL_OLD + "/schedule",
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "ENV": env_name,
@@ -471,6 +474,7 @@ class IkHxrCmsBackendStack(Stack):
                 "SCHEDULES_TABLE_NAME": schedules_table.table_name,
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_DELETE_API_URL": IOT_API_URL + "/sch-delete",
+                "IOT_DELETE_API_URL_OLD": IOT_API_URL_OLD + "/sch-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -700,6 +704,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
+                "IOT_ASSIGN_API_URL_OLD": IOT_API_URL_OLD + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -717,6 +722,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_ASSIGN_API_URL": IOT_API_URL + "/assign",
+                "IOT_ASSIGN_API_URL_OLD": IOT_API_URL_OLD + "/assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -747,6 +753,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
+                "IOT_DELETE_CONTENT_API_URL_OLD": IOT_API_URL_OLD + "/ct-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -764,6 +771,7 @@ class IkHxrCmsBackendStack(Stack):
                 "CONTENTS_TABLE_NAME": contents_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_DELETE_CONTENT_API_URL": IOT_API_URL + "/ct-delete",
+                "IOT_DELETE_CONTENT_API_URL_OLD": IOT_API_URL_OLD + "/ct-delete",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -807,6 +815,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": IOT_API_URL + "/config",
+                "IOT_API_URL_OLD": IOT_API_URL_OLD + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -821,6 +830,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": IOT_API_URL + "/config",
+                "IOT_API_URL_OLD": IOT_API_URL_OLD + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -835,6 +845,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_API_URL": IOT_API_URL + "/config",
+                "IOT_API_URL_OLD": IOT_API_URL_OLD + "/config",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -849,6 +860,7 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "IOT_COMMAND_API_URL": IOT_API_URL + "/command",
+                "IOT_COMMAND_API_URL_OLD": IOT_API_URL_OLD + "/command",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -879,6 +891,7 @@ class IkHxrCmsBackendStack(Stack):
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
                 "IOT_UPDATE_API_URL": IOT_API_URL + "/lp-update",
+                "IOT_UPDATE_API_URL_OLD": IOT_API_URL_OLD + "/lp-update",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],

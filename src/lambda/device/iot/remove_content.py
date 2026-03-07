@@ -11,6 +11,8 @@ import traceback
 from typing import Dict, Any, List, Tuple, Optional
 import boto3
 
+from utils.helpers import get_iot_url_for_device
+
 
 def remove_content_from_device_utility(
     device_id: str, 
@@ -37,8 +39,7 @@ def remove_content_from_device_utility(
         # Get environment variables
         if not devices_table_name:
             devices_table_name = os.environ.get("DEVICES_TABLE_NAME")
-        iot_delete_api_url = os.environ.get("IOT_DELETE_CONTENT_API_URL")
-        
+
         if not devices_table_name:
             return False, "DEVICES_TABLE_NAME environment variable not set", None
 
@@ -56,6 +57,13 @@ def remove_content_from_device_utility(
         response = devices_table.get_item(Key={"id": device_id})
         if "Item" not in response:
             return False, "Device not found", None
+
+        device_item = response["Item"]
+        iot_delete_api_url = get_iot_url_for_device(
+            device_item, "IOT_DELETE_CONTENT_API_URL", "IOT_DELETE_CONTENT_API_URL_OLD"
+        )
+        if not iot_delete_api_url:
+            return False, "IOT_DELETE_CONTENT_API_URL environment variable not set", None
 
         # Look up content details from DynamoDB
         contents_table = dynamodb.Table(contents_table_name)
