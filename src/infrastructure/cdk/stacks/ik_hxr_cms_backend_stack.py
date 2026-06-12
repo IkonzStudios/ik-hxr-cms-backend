@@ -750,6 +750,9 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_APP_ASSIGN_API_URL": IOT_API_URL + "/app-assign",
+                "IOT_APP_ASSIGN_API_URL_OLD": IOT_API_URL_OLD + "/app-assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],

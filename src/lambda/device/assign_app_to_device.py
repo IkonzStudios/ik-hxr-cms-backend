@@ -12,6 +12,7 @@ from utils.helpers import (
 )
 from utils.rbac import check_edit_permission_with_org
 from utils.constants import HTTP_STATUS_CODES, DEVICE_ERROR_MESSAGES, DEVICE_SUCCESS_MESSAGES
+from iot.assign_app import deploy_local_app_to_device_utility
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -84,54 +85,60 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if isinstance(original_applications, str):
             original_applications = json.loads(original_applications) if original_applications else []
 
-        # TODO: Implement IoT application assignment when IoT API becomes available
-        # The IoT service doesn't currently have an API for assigning applications to devices
-        # This functionality will need to be implemented when the IoT API is extended
-        # Expected IoT API call:
-        # success, error_msg, iot_response = assign_application_to_device_utility(
-        #     device_id=device_id,
-        #     application_ids=application_ids,
-        #     applications_table_name=applications_table_name,
-        #     devices_table_name=table_name
-        # )
-        
         database_updated = False
-        
+
         try:
             # Update device's application list in database
             current_applications = existing_device.get("applications", [])
             if isinstance(current_applications, str):
                 current_applications = json.loads(current_applications) if current_applications else []
-            
+
             # Add new application IDs to existing ones (avoid duplicates)
             updated_applications = list(set(current_applications + application_ids))
             update_data = {"applications": updated_applications}
-            
+
             update_error = update_device_in_db(device_id, update_data, table_name)
             if update_error:
                 return update_error
-            
+
             database_updated = True
-                
+
+            # Deploy SWA (local) apps to the device via IoT. Non-SWA apps are a
+            # DB-only assignment and are skipped by the deploy utility.
+            app_deployment_result = None
+            applications_table_name = os.environ.get("APPLICATIONS_TABLE_NAME")
+            content_bucket_name = os.environ.get("CONTENT_BUCKET_NAME")
+
+            if applications_table_name and content_bucket_name:
+                print(f"Triggering local app deployment for device {device_id}")
+                success, error_msg, deploy_response = deploy_local_app_to_device_utility(
+                    device_id=device_id,
+                    application_ids=application_ids,
+                    applications_table_name=applications_table_name,
+                    content_bucket_name=content_bucket_name,
+                    devices_table_name=table_name,
+                )
+                app_deployment_result = {
+                    "success": success,
+                    "error": error_msg,
+                    "response": deploy_response,
+                }
+                if success:
+                    print(f"Local app deployment successful for device {device_id}")
+                else:
+                    print(f"Local app deployment failed for device {device_id}: {error_msg}")
+            else:
+                print("Local app deployment skipped: missing APPLICATIONS_TABLE_NAME or CONTENT_BUCKET_NAME")
+
             # Get updated device to return in response
             updated_device, get_error = get_device_by_id_from_db(device_id, table_name)
             if get_error:
                 updated_device = existing_device  # Fallback to existing device
-            
-            # Create success result for response
-            application_assignment_result = {
-                "success": True,
-                "message": f"{DEVICE_SUCCESS_MESSAGES['APPLICATION_ASSIGNED']} (Database updated only)",
-                "assigned_application_ids": application_ids,
-                "total_applications": len(updated_applications),
-                "warning": "IoT device application assignment not yet implemented. Only database was updated."
-            }
-            
-            print(f"Application assignment successful for device {device_id}")
-            print("TODO: Implement IoT application assignment when API becomes available")
-            
-            return create_device_response(updated_device, {"application_assignment": application_assignment_result})
-                
+
+            # create_device_response returns a 207 (partial success) when the IoT
+            # deployment failed but the database update succeeded.
+            return create_device_response(updated_device, app_deployment_result)
+
         except Exception as e:
             print(f"Error during application assignment: {str(e)}")
             
