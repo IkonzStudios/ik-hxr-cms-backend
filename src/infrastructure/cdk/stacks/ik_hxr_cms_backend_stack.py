@@ -692,6 +692,19 @@ class IkHxrCmsBackendStack(Stack):
             },
         )
 
+        # Presigned upload for SWA application assets (build zip + videos)
+        upload_app_asset_lambda = create_lambda_function(
+            scope=self,
+            construct_id="UploadAppAssetFunction",
+            function_name=f"Cms-UploadAppAsset-{env_name_capitalized}",
+            handler="upload_app_asset.handler",
+            code_path="src/lambda/application",
+            environment={
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "ENV": env_name,
+            },
+        )
+
         # Create new specialized Device Lambda functions
         assign_content_to_device_lambda = create_lambda_function(
             scope=self,
@@ -737,6 +750,9 @@ class IkHxrCmsBackendStack(Stack):
             environment={
                 "DEVICES_TABLE_NAME": devices_table.table_name,
                 "APPLICATIONS_TABLE_NAME": applications_table.table_name,
+                "CONTENT_BUCKET_NAME": content_bucket.bucket_name,
+                "IOT_APP_ASSIGN_API_URL": IOT_API_URL + "/app-assign",
+                "IOT_APP_ASSIGN_API_URL_OLD": IOT_API_URL_OLD + "/app-assign",
                 "ENV": env_name,
             },
             layers=[common_dependencies_layer],
@@ -1014,6 +1030,9 @@ class IkHxrCmsBackendStack(Stack):
         grant_table_permissions(
             get_applications_by_org_lambda, applications_table, "read"
         )
+
+        # Grant S3 write permission to the SWA app asset upload Lambda
+        grant_s3_permissions(upload_app_asset_lambda, content_bucket, "write")
 
         # Grant table permissions to new specialized device Lambda functions
         grant_table_permissions(assign_content_to_device_lambda, devices_table, "read_write")
@@ -1532,6 +1551,15 @@ class IkHxrCmsBackendStack(Stack):
         )
         application_org_id_resource.add_method(
             "GET", get_applications_by_org_integration, authorizer=authorizer
+        )
+
+        # Upload SWA application assets (zip + videos) endpoint
+        upload_app_asset_integration = apigateway.LambdaIntegration(
+            upload_app_asset_lambda
+        )
+        application_upload_resource = application_resource.add_resource("upload")
+        application_upload_resource.add_method(
+            "POST", upload_app_asset_integration, authorizer=authorizer
         )
         # ------------------------------------- END OF APPLICATION API -------------------------------------
 

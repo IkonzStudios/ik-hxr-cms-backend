@@ -114,6 +114,8 @@ def create_application_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "organization_id": body["organization_id"],
         "type": body.get("type", ""),
         "url": body.get("url", ""),
+        "zip_url": body.get("zip_url", ""),
+        "video_urls": body.get("video_urls", []),
         "is_deleted": body.get("is_deleted", False),
         "created_at": current_time,
         "updated_at": current_time,
@@ -332,6 +334,8 @@ def prepare_update_data(body: Dict[str, Any]) -> Dict[str, Any]:
         "is_deleted",
         "type",
         "url",
+        "zip_url",
+        "video_urls",
     ]
 
     update_data = {}

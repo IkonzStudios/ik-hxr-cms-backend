@@ -27,6 +27,8 @@ OPTIONAL_APPLICATION_FIELDS = [
     "updated_by",
     "type",
     "url",
+    "zip_url",
+    "video_urls",
 ]
 
 # Application field types for validation
@@ -38,8 +40,10 @@ APPLICATION_FIELD_TYPES = {
     "platform": str,  # Platform name (e.g., "android", "ios", "web")
     "logo": str,  # Logo URL
     "is_deleted": bool,  # Soft delete flag
-    "type": str,  # Application type (e.g., "PWA", "RPM")
+    "type": str,  # Application type (e.g., "PWA", "RPM", "SWA")
     "url": str,  # Application URL
+    "zip_url": str,  # SWA build zip S3 key
+    "video_urls": list,  # SWA video S3 keys
 }
 
 # Valid platform values
@@ -65,4 +69,5 @@ VALID_STATUS = [
 VALID_APPLICATION_TYPES = [
     "PWA",
     "RPM",
+    "SWA",
 ]
