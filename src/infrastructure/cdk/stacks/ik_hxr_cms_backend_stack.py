@@ -1055,7 +1055,7 @@ class IkHxrCmsBackendStack(Stack):
 
         # Grant table permissions to Device IoT Lambda functions
         grant_table_permissions(configure_device_brightness_lambda, devices_table, "read")
-        grant_table_permissions(configure_device_volume_lambda, devices_table, "read")
+        grant_table_permissions(configure_device_volume_lambda, devices_table, "read_write")
         grant_table_permissions(configure_device_wifi_lambda, devices_table, "read")
         grant_table_permissions(generic_command_lambda, devices_table, "read")
 

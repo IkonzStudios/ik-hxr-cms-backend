@@ -34,11 +34,19 @@ def call_iot_application_schedule_api(
         Tuple of (success, error_message, response_data)
     """
     # Transform applications to match the required payload structure
-    content_payload = {
-        "url": applications[0]["url"]
-    }
+    app_type = applications[0]["type"]
 
-    schedule_type = "url_" + applications[0]["type"].lower();
+    if app_type == "SWA":
+        schedule_type = "local_app"
+        content_payload = {
+            "app_id": applications[0].get("name", "").lower(),
+            "port": 3001
+        }
+    else:
+        schedule_type = "url_" + app_type.lower()
+        content_payload = {
+            "url": applications[0]["url"]
+        }
 
     payload = {
         "action": "schedule_content",
@@ -208,7 +216,8 @@ def collect_applications_from_ids(
         
         application_list.append({
             "type": application_data.get("type", "PWA"),
-            "url": application_data.get("url", "")
+            "url": application_data.get("url", ""),
+            "name": application_data.get("name", "")
         })
     
     return application_list, error_messages

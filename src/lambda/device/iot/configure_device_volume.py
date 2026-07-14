@@ -9,6 +9,7 @@ from utils.helpers import (
     get_device_by_id_from_db,
     create_device_response,
     create_error_response,
+    update_device_volume_in_db,
 )
 from utils.rbac import check_edit_permission_with_org
 from utils.helpers import get_iot_url_for_device
@@ -107,6 +108,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Parse the IoT API response
                 iot_response = response.json() if response.text else {}
                 
+                # Persist the configured volume so the UI reflects it on reload
+                volume_to_store = int(volume)
+                update_error = update_device_volume_in_db(device_id, volume_to_store, devices_table_name)
+                if update_error:
+                    return update_error
+                existing_device["volume"] = volume_to_store
+
                 # Create volume configuration result
                 volume_config_result = {
                     "success": True,
@@ -114,7 +122,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     "volume": volume,
                     "iot_response": iot_response
                 }
-                
+
                 print(f"Volume configuration successful for device {device_id}")
                 return create_device_response(existing_device, {"volume_configuration": volume_config_result})
             else:
