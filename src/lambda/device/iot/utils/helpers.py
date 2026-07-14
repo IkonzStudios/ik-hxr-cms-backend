@@ -187,8 +187,47 @@ def format_response_device(device_data: Dict[str, Any]) -> Dict[str, Any]:
         response_device["cpu_usage"] = float(response_device["cpu_usage"])
     if response_device.get("memory_usage") is not None:
         response_device["memory_usage"] = float(response_device["memory_usage"])
-    
+    if response_device.get("volume") is not None:
+        response_device["volume"] = int(response_device["volume"])
+
     if response_device.get("schedules") is not None and isinstance(response_device.get("schedules"), str):
         response_device["schedules"] = json.loads(response_device["schedules"])
 
     return response_device
+
+
+def update_device_volume_in_db(
+    device_id: str, volume: int, table_name: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Persist the configured volume for a device in DynamoDB.
+
+    Returns:
+        None if successful, error response dict if failed
+    """
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(table_name)
+
+        table.update_item(
+            Key={"id": device_id},
+            UpdateExpression="SET #volume = :volume, #last_updated = :last_updated",
+            ExpressionAttributeNames={
+                "#volume": "volume",
+                "#last_updated": "last_updated",
+            },
+            ExpressionAttributeValues={
+                ":volume": int(volume),
+                ":last_updated": datetime.now().isoformat(),
+            },
+            ConditionExpression="attribute_exists(id)",
+        )
+        return None
+
+    except Exception as e:
+        print(f"Error updating device volume: {str(e)}")
+        return {
+            "statusCode": 500,
+            "headers": get_cors_headers(),
+            "body": json.dumps({"error": "Internal server error"}),
+        }
